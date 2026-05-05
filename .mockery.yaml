@@ -1,0 +1,12 @@
+template: testify
+template-data:
+  unroll-variadic: true
+filename: "Mock{{.InterfaceName}}.go"
+pkgname: "mocks"
+dir: ./internal/testing/mocks
+packages:
+  go.lumeweb.com/portal-plugin-sia/core:
+    interfaces:
+      SiaService: {}
+      QuotaService: {}
+      AdminClient: {}
