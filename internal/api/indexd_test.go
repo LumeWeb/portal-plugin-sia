@@ -203,7 +203,7 @@ func TestAuthConnectUI_UnauthenticatedRedirect(t *testing.T) {
 
 		resp := helper.makeRequest(http.MethodGet, "/auth/connect/test-request-id", nil)
 
-		assert.Equal(t, http.StatusMovedPermanently, resp.Code)
+		assert.Equal(t, http.StatusFound, resp.Code)
 		loc := resp.Header().Get("Location")
 		assert.Contains(t, loc, "return=")
 	}, TestOptions)

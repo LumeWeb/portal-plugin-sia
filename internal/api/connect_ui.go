@@ -217,7 +217,7 @@ func (a *API) HandleGETAuthConnect(c echo.Context) error {
 		}
 		dest.RawQuery = url.Values{"return": {c.Request().URL.String()}}.Encode()
 
-		return c.Redirect(http.StatusMovedPermanently, dest.String())
+		return c.Redirect(http.StatusFound, dest.String())
 	}
 
 	c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
