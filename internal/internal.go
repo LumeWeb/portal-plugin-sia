@@ -8,7 +8,9 @@ const (
 )
 
 const (
-	FundingSyncCronSchedule = "0 * * * *"
+	FundingSyncCronSchedule        = "0 * * * *"
+	AuthRequestCleanupCronSchedule = "*/5 * * * *"
+	AuthRequestTTL                 = 10 * time.Minute
 )
 
 // AccountFundInterval is the funding interval used by indexd.

@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Approve or reject application connection request">
+  <title>Connect — {{.AppName}}</title>
+  <style>
+    :root {
+      --color-background:              #0D1D1C;
+      --color-subtle-background:       #111C1B;
+      --color-ui-element-background:   #0D2D2A;
+      --color-hovered-ui-element:      #103835;
+      --color-active-ui-element:       #153F3B;
+
+      --color-borders:                 #1A3432;
+      --color-ui-element-border:      #1F524D;
+      --color-hovered-element-border:  #256660;
+
+      --color-solid-background:        #12736B;
+      --color-hovered-solid-bg:        #15807A;
+
+      --color-low-contrast-text:       #ABEEDB;
+      --color-high-contrast-text:      #F8F8F8;
+      --color-muted-text:              #A9B5B3;
+
+      --color-destructive:             #EF4343;
+      --color-destructive-foreground:  #DC2828;
+
+      --radius:                        6px;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+      background-color: var(--color-background);
+      color: var(--color-high-contrast-text);
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background-color: var(--color-background);
+      z-index: 0;
+    }
+
+    .card {
+      position: relative;
+      z-index: 1;
+      background-color: var(--color-subtle-background);
+      border: 1px solid var(--color-borders);
+      border-radius: var(--radius);
+      width: 100%;
+      max-width: 25rem;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .app-header {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+      text-align: center;
+    }
+
+    .app-logo {
+      width: 3.5rem;
+      height: 3.5rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--color-borders);
+      background-color: var(--color-ui-element-background);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .app-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: calc(var(--radius) - 1px);
+    }
+
+    .app-logo-placeholder {
+      width: 1.75rem;
+      height: 1.75rem;
+      color: var(--color-muted-text);
+    }
+
+    .app-name {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: var(--color-high-contrast-text);
+      line-height: 1.3;
+    }
+
+    .app-description {
+      font-size: 0.875rem;
+      color: var(--color-muted-text);
+      line-height: 1.5;
+    }
+
+    .divider {
+      height: 1px;
+      background-color: var(--color-borders);
+      width: 100%;
+    }
+
+    .info-section {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .info-text {
+      font-size: 0.875rem;
+      color: var(--color-high-contrast-text);
+      line-height: 1.6;
+    }
+
+    .helper-text {
+      font-size: 0.8125rem;
+      color: var(--color-muted-text);
+      line-height: 1.5;
+    }
+
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.625rem;
+      margin-top: 0.5rem;
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.625rem 1rem;
+      border-radius: var(--radius);
+      font-size: 0.875rem;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+      outline: none;
+      line-height: 1.4;
+    }
+
+    .btn:focus-visible {
+      border-color: var(--color-hovered-element-border);
+      box-shadow: 0 0 0 2px var(--color-hovered-element-border);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background-color: var(--color-solid-background);
+      color: var(--color-high-contrast-text);
+      border-color: var(--color-solid-background);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background-color: var(--color-hovered-solid-bg);
+      border-color: var(--color-hovered-solid-bg);
+    }
+
+    .btn-primary:active:not(:disabled) {
+      background-color: var(--color-active-ui-element);
+    }
+
+    .btn-destructive {
+      background-color: transparent;
+      color: var(--color-destructive);
+      border-color: var(--color-destructive);
+    }
+
+    .btn-destructive:hover:not(:disabled) {
+      background-color: var(--color-destructive);
+      color: var(--color-high-contrast-text);
+    }
+
+    .btn-destructive:active:not(:disabled) {
+      background-color: var(--color-destructive-foreground);
+      color: var(--color-high-contrast-text);
+    }
+
+    .btn-ghost {
+      background-color: transparent;
+      color: var(--color-low-contrast-text);
+      border-color: var(--color-ui-element-border);
+    }
+
+    .btn-ghost:hover:not(:disabled) {
+      background-color: var(--color-hovered-ui-element);
+      border-color: var(--color-hovered-element-border);
+    }
+
+    .btn-ghost:active:not(:disabled) {
+      background-color: var(--color-active-ui-element);
+    }
+
+    .error-message {
+      font-size: 0.8125rem;
+      color: var(--color-destructive);
+      line-height: 1.5;
+      padding: 0.625rem 0.75rem;
+      background-color: rgba(239, 67, 67, 0.08);
+      border: 1px solid rgba(239, 67, 67, 0.2);
+      border-radius: var(--radius);
+      display: none;
+    }
+
+    .error-message.visible {
+      display: block;
+    }
+
+    .result {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      text-align: center;
+    }
+
+    .result.visible {
+      display: flex;
+    }
+
+    .result-icon {
+      width: 3rem;
+      height: 3rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .result-icon.icon-approved {
+      background-color: rgba(18, 115, 107, 0.15);
+      border: 1px solid rgba(18, 115, 107, 0.3);
+    }
+
+    .result-icon.icon-rejected {
+      background-color: rgba(239, 67, 67, 0.1);
+      border: 1px solid rgba(239, 67, 67, 0.2);
+    }
+
+    .result-icon svg {
+      width: 1.5rem;
+      height: 1.5rem;
+    }
+
+    .result-icon .icon-check {
+      display: none;
+    }
+
+    .result-icon .icon-x {
+      display: none;
+    }
+
+    .result-icon.icon-approved .icon-check {
+      display: block;
+    }
+
+    .result-icon.icon-rejected .icon-x {
+      display: block;
+    }
+
+    .result-title {
+      font-size: 1.125rem;
+      font-weight: 600;
+      color: var(--color-high-contrast-text);
+      line-height: 1.3;
+    }
+
+    .result-description {
+      font-size: 0.875rem;
+      color: var(--color-muted-text);
+      line-height: 1.5;
+    }
+
+    .footer {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.375rem;
+      font-size: 0.75rem;
+      color: var(--color-muted-text);
+      padding-top: 0.5rem;
+    }
+
+    .footer-logo {
+      height: 1.125rem;
+      width: auto;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .btn {
+        transition: none;
+      }
+    }
+
+    @media (max-width: 30em) {
+      body {
+        padding: 1rem;
+        align-items: flex-start;
+        padding-top: 3rem;
+      }
+      .card {
+        padding: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="overlay" aria-hidden="true"></div>
+
+  <main class="card" role="dialog" aria-labelledby="connect-heading" aria-describedby="connect-description">
+    <div id="connect-form">
+      <div class="app-header">
+        <div class="app-logo">
+          <img id="app-logo-img" src="{{.AppLogoURL}}" alt="" aria-hidden="true" onerror="this.style.display='none';document.getElementById('app-logo-placeholder').style.display='flex';">
+          <svg id="app-logo-placeholder" class="app-logo-placeholder" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:none;">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <polyline points="21 15 16 10 5 21"></polyline>
+          </svg>
+        </div>
+        <h1 class="app-name" id="connect-heading">{{.AppName}}</h1>
+        {{if .AppDescription}}<p class="app-description">{{.AppDescription}}</p>{{end}}
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="info-section">
+        <p class="info-text" id="connect-description">Connecting to this application will allow it to upload and download data on your behalf.</p>
+        <p class="helper-text">Apps cannot access data from other connected apps and you can revoke access at any time.</p>
+      </div>
+
+      <div id="error-container" class="error-message" role="alert" aria-live="polite"></div>
+
+      <div class="actions">
+        <button type="button" class="btn btn-primary" data-action="approve" aria-label="Approve connection request">Approve</button>
+        <button type="button" class="btn btn-destructive" data-action="reject" aria-label="Reject connection request">Reject</button>
+      </div>
+    </div>
+
+    <div id="result" class="result" role="status" aria-live="polite">
+      <div id="result-icon" class="result-icon" aria-hidden="true">
+        <svg class="icon-check" viewBox="0 0 24 24" fill="none" stroke="var(--color-solid-background)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        <svg class="icon-x" viewBox="0 0 24 24" fill="none" stroke="var(--color-destructive)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </div>
+      <h2 id="result-title" class="result-title"></h2>
+      <p id="result-description" class="result-description"></p>
+      <button type="button" id="result-btn" class="btn"></button>
+    </div>
+
+    <footer class="footer">
+      Powered by
+      <svg class="footer-logo" viewBox="0 0 373 373" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Pinner"><path d="M45.9695 213.883C20.9759 188.89 20.9759 148.367 45.9695 123.374L78.4392 90.9038C89.3635 79.9796 107.075 79.9796 117.999 90.9039V90.9039C128.924 101.828 128.924 119.54 117.999 130.464L108.867 139.597C92.8983 155.565 92.8983 181.455 108.867 197.423L224.149 312.705C235.106 323.662 235.106 341.427 224.149 352.384V352.384C213.192 363.341 195.427 363.341 184.47 352.384L45.9695 213.883Z" fill="currentColor"/><path d="M253.686 85.7724C278.68 110.766 278.68 151.288 253.686 176.282L218.76 211.208C209.362 220.606 194.124 220.606 184.726 211.208V211.208C175.327 201.81 175.327 186.572 184.726 177.173L196.53 165.369C212.448 149.45 212.448 123.642 196.53 107.724L148.851 60.045C137.929 49.1225 137.929 31.4137 148.851 20.4912V20.4912C159.774 9.56872 177.483 9.56872 188.405 20.4912L253.686 85.7724Z" fill="currentColor" opacity="0.75"/></svg>
+    </footer>
+  </main>
+
+  <script>
+    (function() {
+      var callbackURL = "{{.CallbackURL}}";
+      var form = document.getElementById("connect-form");
+      var result = document.getElementById("result");
+      var resultIcon = document.getElementById("result-icon");
+      var resultTitle = document.getElementById("result-title");
+      var resultDesc = document.getElementById("result-description");
+      var resultBtn = document.getElementById("result-btn");
+      var errorContainer = document.getElementById("error-container");
+      var buttons = form.querySelectorAll('[data-action]');
+
+      function showError(message) {
+        errorContainer.textContent = message;
+        errorContainer.classList.add("visible");
+      }
+
+      function hideError() {
+        errorContainer.textContent = "";
+        errorContainer.classList.remove("visible");
+      }
+
+      function setLoading(loading) {
+        buttons.forEach(function(btn) { btn.disabled = loading; });
+        if (loading) hideError();
+      }
+
+      function showResult(approved) {
+        form.style.display = "none";
+        resultIcon.className = "result-icon " + (approved ? "icon-approved" : "icon-rejected");
+        resultTitle.textContent = approved ? "Connection approved" : "Connection rejected";
+        resultDesc.textContent = approved ? "You can return to the application." : "You can close this window and return to the application.";
+        resultBtn.className = "btn " + (approved ? "btn-primary" : "btn-ghost");
+        resultBtn.textContent = approved ? "Return to app" : "Close";
+        result.classList.add("visible");
+        resultBtn.focus();
+      }
+
+      function navigateAway() {
+        if (callbackURL) window.location.href = callbackURL;
+        else window.close();
+      }
+
+      function submit(approve) {
+        var btn = form.querySelector('[data-action="' + (approve ? "approve" : "reject") + '"]');
+        var originalText = btn.textContent;
+        setLoading(true);
+        btn.textContent = approve ? "Approving…" : "Rejecting…";
+
+        fetch(window.location.href, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ approve: approve }),
+          credentials: "same-origin"
+        })
+        .then(function(response) {
+          if (response.status === 204 || response.status === 200) { showResult(approve); return; }
+          return response.text().then(function(text) {
+            var message = "An unexpected error occurred.";
+            try { var p = JSON.parse(text); message = p.message || p.error || message; }
+            catch(e) { if (text) message = text; }
+            throw new Error(message);
+          });
+        })
+        .catch(function(err) {
+          showError(err.message || "Failed to process request. Please try again.");
+          btn.textContent = originalText;
+          setLoading(false);
+        });
+      }
+
+      buttons.forEach(function(btn) {
+        btn.addEventListener("click", function() { submit(btn.dataset.action === "approve"); });
+      });
+
+      resultBtn.addEventListener("click", navigateAway);
+
+      document.addEventListener("keydown", function(e) {
+        if (e.key === "Escape" && result.classList.contains("visible")) navigateAway();
+      });
+    })();
+  </script>
+</body>
+</html>

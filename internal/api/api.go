@@ -283,12 +283,16 @@ func (a *API) Configure(r router.Router, accessSvc core.AccessService) error {
 	connectRegisterRoutes := buildConnectRegisterRoutes(a)
 	router.RegisterRoutes(r, accessSvc, a.Subdomain(), connectRegisterRoutes)
 
-	// Connect public routes (no auth — indexd validates signed URL for status, UI page has no auth)
+	// Connect public routes (no auth — indexd validates signed URL for status, UI page handles auth internally)
 	connectPublicRoutes := []router.RouteDefinition{
-		router.NewRoute(http.MethodGet, "/auth/connect/:requestID", echo.WrapHandler(a.proxy),
+		router.NewRoute(http.MethodGet, "/auth/connect/:requestID", a.HandleGETAuthConnect,
+			router.WithMiddlewares(middleware.AuthMiddleware(a.Context(),
+				middleware.WithAuthPurpose(jwt.PurposeLogin, jwt.PurposeAPI),
+				middleware.WithAuthEmptyAllowed(true),
+			)),
 			router.WithSwagger(
 				router.WithSummary("Get connection request UI"),
-				router.WithDescription("Returns an HTML page for the user to approve or reject the application connection request."),
+				router.WithDescription("Returns an HTML page for the user to approve or reject the application connection request. Unauthenticated users are redirected to the portal login page."),
 				router.WithTags(tagAuth),
 				router.WithPathParam("requestID", "Connect request ID", ""),
 				router.WithSuccessResponse(http.StatusOK, "HTML authorization page"),

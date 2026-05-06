@@ -60,6 +60,13 @@ func GetPluginInfo() core.PluginInfo {
 				},
 				Schedule: core.NewCronScheduleDefinition(core.CronScheduleTypeCron).WithCronExpression(internal.FundingSyncCronSchedule),
 			},
+			{
+				Name: "sia.auth_request_cleanup",
+				Factory: func() (core.CronJob, error) {
+					return cron.NewAuthRequestCleanupJob(), nil
+				},
+				Schedule: core.NewCronScheduleDefinition(core.CronScheduleTypeCron).WithCronExpression(internal.AuthRequestCleanupCronSchedule),
+			},
 		},
 	}
 }

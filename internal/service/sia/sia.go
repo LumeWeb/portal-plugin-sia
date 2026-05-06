@@ -120,8 +120,7 @@ func (s *SiaService) CleanupExpiredAuthRequests(ctx context.Context) error {
 	defer span.End()
 
 	return db.RetryableComponentTransaction(s, ctx, func(tx *gorm.DB) *gorm.DB {
-		// Auth requests expire 10 minutes after creation
-		return tx.Where("created_at < ?", time.Now().Add(-10*time.Minute)).Delete(&siaDB.AuthRequest{})
+		return tx.Where("created_at < ?", time.Now().Add(-internal.AuthRequestTTL)).Delete(&siaDB.AuthRequest{})
 	})
 }
 
