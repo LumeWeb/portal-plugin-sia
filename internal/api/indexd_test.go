@@ -152,6 +152,21 @@ func TestAuthConnect_Success(t *testing.T) {
 	}, TestOptions)
 }
 
+func TestAuthConnect_Reject(t *testing.T) {
+	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
+		helper := newMockHelper(t, ctx)
+		token, _ := helper.SetupAuthenticatedTest()
+
+		mockSiaService := core.GetService[*siaMocks.MockSiaService](ctx, pluginCore.SIA_SERVICE)
+		mockSiaService.EXPECT().DeleteAuthRequest(mock.Anything, "test-request-id").Return(nil)
+
+		reqBody := indexdApp.ApproveAppRequest{Approve: false}
+		resp := helper.makeAuthenticatedRequest(http.MethodPost, "/auth/connect/test-request-id", token, mustMarshalJSON(t, reqBody))
+
+		assert.Equal(t, http.StatusOK, resp.Code)
+	}, TestOptions)
+}
+
 func TestAuthConnect_InvalidRequest(t *testing.T) {
 	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
 		helper := newMockHelper(t, ctx)
@@ -182,15 +197,44 @@ func TestAuthConnectInit_Success(t *testing.T) {
 	}, TestOptions)
 }
 
-func TestAuthConnectUI_Success(t *testing.T) {
+func TestAuthConnectUI_UnauthenticatedRedirect(t *testing.T) {
 	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
 		helper := newMockHelper(t, ctx)
 
 		resp := helper.makeRequest(http.MethodGet, "/auth/connect/test-request-id", nil)
 
-		assert.Equal(t, http.StatusOK, resp.Code)
-		assert.Contains(t, resp.Body.String(), "Auth Connect Page")
+		assert.Equal(t, http.StatusMovedPermanently, resp.Code)
+		loc := resp.Header().Get("Location")
+		assert.Contains(t, loc, "return=")
 	}, TestOptions)
+}
+
+func TestAuthConnectUI_AuthenticatedRendersPage(t *testing.T) {
+	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
+		helper := newMockHelper(t, ctx)
+		token, _ := helper.SetupAuthenticatedTest()
+
+		resp := helper.makeAuthenticatedRequest(http.MethodGet, "/auth/connect/test-request-id", token, nil)
+
+		assert.Equal(t, http.StatusOK, resp.Code)
+		assert.Contains(t, resp.Header().Get("Content-Type"), "text/html")
+		body := resp.Body.String()
+		assert.Contains(t, body, `src="https://example.com/logo.png"`)
+		assert.Contains(t, body, "Test App")
+		assert.Contains(t, body, "A test application")
+		assert.Contains(t, body, `var callbackURL = "https:\/\/example.com\/callback"`)
+	}, TestOptions)
+}
+
+func TestParseAuthConnectHTML(t *testing.T) {
+	html := fakeIndexdAuthConnectHTML("My App", "My Description", "https://example.com/logo.png", "https://callback.example.com")
+
+	data, err := parseAuthConnectHTML(html)
+	assert.NoError(t, err)
+	assert.Equal(t, "https://example.com/logo.png", data.AppLogoURL)
+	assert.Equal(t, "My App", data.AppName)
+	assert.Equal(t, "My Description", data.AppDescription)
+	assert.Equal(t, "https://callback.example.com", data.CallbackURL)
 }
 
 func TestAuthConnectStatus_Success(t *testing.T) {

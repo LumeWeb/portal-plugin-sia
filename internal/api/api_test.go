@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -180,7 +181,7 @@ func TestMain(m *testing.M) {
 	mux.HandleFunc("GET /auth/connect/{requestID}", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("<html><body>Auth Connect Page</body></html>"))
+		w.Write([]byte(fakeIndexdAuthConnectHTML("Test App", "A test application", "https://example.com/logo.png", "https://example.com/callback")))
 	})
 
 	// GET /auth/connect/{requestID}/status - Auth Connect Status
@@ -201,9 +202,21 @@ func TestMain(m *testing.M) {
 		json.NewEncoder(w).Encode(nil)
 	})
 
-	// POST /auth/connect/{requestID} - Approve Connection (basic auth)
+	// POST /auth/connect/{requestID} - Approve/Reject Connection (basic auth)
 	mux.HandleFunc("POST /auth/connect/{requestID}", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
+		var req struct {
+			Approve bool `json:"approve"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		if req.Approve {
+			w.WriteHeader(http.StatusNoContent)
+		} else {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(nil)
+		}
 	})
 
 	// DELETE /objects/{key} - Unpin Object
@@ -244,6 +257,10 @@ func TestMain(m *testing.M) {
 			AppURL: fakeIndexd.URL,
 		}),
 	)
+}
+
+func fakeIndexdAuthConnectHTML(name, description, logoURL, callbackURL string) string {
+	return fmt.Sprintf(`<!DOCTYPE html><html><body><div class="overlay"></div><div id="modal" class="card" role="dialog" aria-modal="true" aria-labelledby="dlg-title"><div class="header"><div class="logo"><img src="%s" alt="app logo" style="width: 100%%; height: 100%%; object-fit: cover"/></div><div><h1 id="dlg-title" class="title">Connect to app?</h1><p class="subtitle">%s</p></div></div><div class="copy"><p class="subtitle">%s</p><p>Connecting to this application will allow it to upload and download data on your behalf.</p></div><div class="actions"><button id="rejectButton" class="btn btn-danger">Reject</button><button id="acceptButton" class="btn btn-primary">Accept</button></div></div><script>function respondToRequest(approve){}function renderResult(approved){const callbackUrl = "%s";if(callbackUrl)window.location.href=callbackUrl;}</script></body></html>`, logoURL, name, description, callbackURL)
 }
 
 // TestOptions provides test configuration for API tests
