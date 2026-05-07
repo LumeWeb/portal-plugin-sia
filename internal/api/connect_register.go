@@ -53,6 +53,7 @@ func (a *API) HandlePOSTAuthConnectRegister(c echo.Context) error {
 
 	proxyReq.Header.Set("Content-Type", c.Request().Header.Get("Content-Type"))
 	proxyReq.Header.Set("User-Agent", c.Request().Header.Get("User-Agent"))
+	proxyReq.Host = a.resolvePublicHost()
 
 	client := &http.Client{}
 	resp, err := client.Do(proxyReq)

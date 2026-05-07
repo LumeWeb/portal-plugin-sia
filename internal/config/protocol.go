@@ -15,7 +15,7 @@ var (
 type ProtocolConfig struct {
 	Key    string `config:"key"`     // Admin password for indexd
 	URL    string `config:"url"`     // Admin URL for indexd (indexd admin API)
-	AppURL string `config:"app_url"` // App URL for user-facing indexd (app API) - internal
+	AppURL string `config:"app_url"` // Internal proxy target for indexd app API (signing uses public subdomain)
 }
 
 func (c ProtocolConfig) Schema() z.ZogSchema {

@@ -79,6 +79,7 @@ func (a *API) HandlePOSTAuthConnect(c echo.Context) error {
 
 	proxyReq.Header.Set("Content-Type", c.Request().Header.Get("Content-Type"))
 	proxyReq.Header.Set("User-Agent", c.Request().Header.Get("User-Agent"))
+	proxyReq.Host = a.resolvePublicHost()
 
 	if len(account.ConnectKey) == 0 {
 		return echo.NewHTTPError(http.StatusInternalServerError, "connect key not available")

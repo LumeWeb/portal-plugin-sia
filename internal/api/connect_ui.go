@@ -172,6 +172,7 @@ func (a *API) HandleGETAuthConnect(c echo.Context) error {
 	}
 
 	proxyReq.Header.Set("User-Agent", c.Request().Header.Get("User-Agent"))
+	proxyReq.Host = a.resolvePublicHost()
 
 	client := &http.Client{}
 	resp, err := client.Do(proxyReq)
