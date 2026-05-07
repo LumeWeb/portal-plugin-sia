@@ -200,7 +200,8 @@ func (s *SiaService) RegisterAccount(ctx context.Context, userID uint) (*siaDB.S
 	defer timer.ObserveDuration()
 
 	account := &siaDB.SiaAccount{
-		UserID: userID,
+		UserID:             userID,
+		LastFundingEventAt: time.Unix(0, 0),
 	}
 
 	err := db.RetryableComponentTransaction(s, ctx, func(tx *gorm.DB) *gorm.DB {
