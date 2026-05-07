@@ -111,11 +111,7 @@ func (a *API) HandlePOSTAuthConnect(c echo.Context) error {
 		}
 	}
 
-	for key, values := range resp.Header {
-		for _, value := range values {
-			c.Response().Writer.Header().Add(key, value)
-		}
-	}
+	copyProxyResponseHeaders(c.Response().Writer, resp)
 	c.Response().Status = resp.StatusCode
 	c.Response().Write(respBody)
 

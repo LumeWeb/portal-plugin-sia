@@ -70,11 +70,7 @@ func (a *API) HandlePOSTAuthConnectInit(c echo.Context) error {
 
 	// If not OK, return as-is
 	if resp.StatusCode != http.StatusOK {
-		for key, values := range resp.Header {
-			for _, value := range values {
-				c.Response().Writer.Header().Add(key, value)
-			}
-		}
+		copyProxyResponseHeaders(c.Response().Writer, resp)
 		c.Response().Status = resp.StatusCode
 		c.Response().Write(respBody)
 		return nil
@@ -105,7 +101,7 @@ func (a *API) HandlePOSTAuthConnectInit(c echo.Context) error {
 	registerResp.RegisterURL = fmt.Sprintf("%s/auth/connect/%s/register", portalBaseURL, requestID)
 
 	// Return rewritten response
-	c.Response().Header().Set("Content-Type", "application/json; charset=utf-8")
+	c.Response().Header().Set("Content-Type", "application/json")
 	c.Response().Status = resp.StatusCode
 	return json.NewEncoder(c.Response()).Encode(registerResp)
 }
