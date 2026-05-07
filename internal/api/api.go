@@ -215,6 +215,21 @@ func (a *API) resolveProxyURL() string {
 	return a.protocolConfig.AppURL
 }
 
+// resolvePublicHost returns the hostname that indexd expects in the Host header.
+// Indexd validates jc.Request.Host against its advertiseURL hostname, which in
+// the deployed environment matches the portal's public subdomain (since all
+// requests route through the portal). Manual proxy requests must set this Host
+// header to pass indexd's hostname validation, even though they connect to the
+// internal AppURL target.
+func (a *API) resolvePublicHost() string {
+	httpSvc := core.GetService[core.HTTPService](a.Context(), core.HTTP_SERVICE)
+	host := httpSvc.APISubdomain(a.ID(), false)
+	if httpSvc.Port() != 0 && httpSvc.Port() != 443 && httpSvc.Port() != 80 {
+		host = fmt.Sprintf("%s:%d", host, httpSvc.Port())
+	}
+	return host
+}
+
 // copyProxyResponseHeaders copies response headers from the upstream response
 // to the echo response, normalizing Content-Type to match what the indexd SDK
 // expects. The SDK does an exact string match on Content-Type against the
