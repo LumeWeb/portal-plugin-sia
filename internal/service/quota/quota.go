@@ -287,7 +287,7 @@ func (s *QuotaService) SyncFunding(ctx context.Context) error {
 
 					// Update account cursor
 					account.LastFundingEventID = event.ID
-					account.LastFundingEventAt = event.CreatedAt
+					account.LastFundingEventAt = &event.CreatedAt
 					if err := db.RetryableComponentTransaction(s, ctx, func(tx *gorm.DB) *gorm.DB {
 						return tx.Save(&account)
 					}); err != nil {
