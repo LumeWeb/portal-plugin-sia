@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	jwt "go.lumeweb.com/portal-middleware/auth/jwt"
@@ -212,6 +213,24 @@ func (a *API) Name() string {
 
 func (a *API) resolveProxyURL() string {
 	return a.protocolConfig.AppURL
+}
+
+// copyProxyResponseHeaders copies response headers from the upstream response
+// to the echo response, normalizing Content-Type to match what the indexd SDK
+// expects. The SDK does an exact string match on Content-Type against the
+// Accept header (e.g. "application/json"), but Go's http handlers append
+// "; charset=utf-8" by default, causing the match to fail.
+func copyProxyResponseHeaders(dst http.ResponseWriter, src *http.Response) {
+	for key, values := range src.Header {
+		for _, value := range values {
+			dst.Header().Add(key, value)
+		}
+	}
+	if ct := dst.Header().Get("Content-Type"); ct != "" {
+		if before, _, found := strings.Cut(ct, ";"); found && strings.HasPrefix(before, "application/json") {
+			dst.Header().Set("Content-Type", before)
+		}
+	}
 }
 
 // buildAppURL constructs a URL to the indexd app API with the given path,
