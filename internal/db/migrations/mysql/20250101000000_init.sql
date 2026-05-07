@@ -1,5 +1,4 @@
 -- +goose Up
--- +goose StatementBegin
 CREATE TABLE IF NOT EXISTS sia_accounts (
     id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
     user_id BIGINT UNSIGNED NOT NULL,
@@ -85,10 +84,8 @@ CREATE TABLE IF NOT EXISTS sia_auth_requests (
     INDEX idx_sia_auth_requests_user_id (user_id),
     INDEX idx_sia_auth_requests_deleted_at (deleted_at)
 );
--- +goose StatementEnd
 
 -- +goose Down
--- +goose StatementBegin
 DROP TABLE IF EXISTS sia_auth_requests;
 DROP TABLE IF EXISTS sia_object_slabs;
 DROP TABLE IF EXISTS sia_objects;
@@ -96,4 +93,3 @@ DROP TABLE IF EXISTS sia_slabs;
 DROP TABLE IF EXISTS sia_funding_cursors;
 DROP TABLE IF EXISTS sia_app_accounts;
 DROP TABLE IF EXISTS sia_accounts;
--- +goose StatementEnd
