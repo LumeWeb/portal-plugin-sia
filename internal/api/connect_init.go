@@ -51,7 +51,6 @@ func (a *API) HandlePOSTAuthConnectInit(c echo.Context) error {
 	// Copy headers
 	proxyReq.Header.Set("Content-Type", c.Request().Header.Get("Content-Type"))
 	proxyReq.Header.Set("User-Agent", c.Request().Header.Get("User-Agent"))
-	proxyReq.Host = a.resolvePublicHost()
 
 	// Execute request
 	client := &http.Client{}

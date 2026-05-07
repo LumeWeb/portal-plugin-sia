@@ -1,0 +1,2 @@
+plugin.sia.protocol:
+  app_url: "http://localhost:8081/"

@@ -214,11 +214,6 @@ func (a *API) resolveProxyURL() string {
 	return a.protocolConfig.AppURL
 }
 
-func (a *API) resolvePublicHost() string {
-	httpSvc := core.GetService[core.HTTPService](a.Context(), core.HTTP_SERVICE)
-	return httpSvc.APISubdomain(a.ID(), false)
-}
-
 // buildAppURL constructs a URL to the indexd app API with the given path,
 // preserving signed URL query parameters from the original request.
 func (a *API) buildAppURL(originalURL *url.URL, path string) (string, error) {
