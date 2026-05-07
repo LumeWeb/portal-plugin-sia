@@ -205,7 +205,7 @@ func (a *API) HandleGETAuthConnect(c echo.Context) error {
 	_, err = mcontext.GetUserID(c)
 	if err != nil {
 		httpSvc := core.GetService[core.HTTPService](a.Context(), core.HTTP_SERVICE)
-		dashboardURL := httpSvc.APISubdomain("dashboard", true)
+		dashboardURL := a.appendPort(httpSvc.APISubdomain("dashboard", true))
 
 		dest, err := url.Parse(dashboardURL)
 		if err != nil {
