@@ -13,7 +13,7 @@ type SiaAccount struct {
 	QuotaKey           string
 	FundTargetBytes    uint64
 	LastFundingEventID int64
-	LastFundingEventAt time.Time
+	LastFundingEventAt *time.Time
 	AppAccounts        []SiaAppAccount
 }
 
