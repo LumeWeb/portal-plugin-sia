@@ -14,23 +14,16 @@ import (
 	"go.uber.org/zap"
 )
 
-// approvalRequest represents the body of the connect approval request.
 type approvalRequest struct {
 	Approve bool `json:"approve"`
 }
 
-// HandlePOSTAuthConnect handles the approval/rejection of connect requests.
-// It requires JWT authentication to determine the user, gets the connect key from the database,
-// and proxies the request to indexd with Basic Auth injected.
-//
-// @Param requestID path string required "Request ID"
 func (a *API) HandlePOSTAuthConnect(c echo.Context) error {
 	requestID := c.Param("requestID")
 	if requestID == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "missing request ID")
 	}
 
-	// Get userID from JWT token
 	userID, err := mcontext.GetUserID(c)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, "login required")
@@ -50,14 +43,20 @@ func (a *API) HandlePOSTAuthConnect(c echo.Context) error {
 
 	ctx := c.Request().Context()
 
-	// Get SiaService
 	siaService := core.GetService[pluginCore.SiaService](a.Context(), pluginCore.SIA_SERVICE)
 
-	// Use GetAccount method with userID from JWT
 	account, err := siaService.GetAccount(ctx, userID)
-	if err != nil {
-		a.Logger().Error("failed to find SiaAccount", zap.Uint("userID", userID), zap.Error(err))
-		return echo.NewHTTPError(http.StatusInternalServerError, "account not found")
+	if err != nil || len(account.ConnectKey) == 0 {
+		quotaSvc := core.GetService[pluginCore.QuotaService](a.Context(), pluginCore.QUOTA_SERVICE)
+		if err := quotaSvc.ProvisionAccount(ctx, userID); err != nil {
+			a.Logger().Error("failed to provision account", zap.Uint("userID", userID), zap.Error(err))
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to provision account")
+		}
+		account, err = siaService.GetAccount(ctx, userID)
+		if err != nil {
+			a.Logger().Error("failed to get account after provisioning", zap.Uint("userID", userID), zap.Error(err))
+			return echo.NewHTTPError(http.StatusInternalServerError, "account not found")
+		}
 	}
 
 	targetURL, err := a.buildAppURL(c.Request().URL, fmt.Sprintf("/auth/connect/%s", requestID))
@@ -79,10 +78,6 @@ func (a *API) HandlePOSTAuthConnect(c echo.Context) error {
 
 	proxyReq.Header.Set("Content-Type", c.Request().Header.Get("Content-Type"))
 	proxyReq.Header.Set("User-Agent", c.Request().Header.Get("User-Agent"))
-
-	if len(account.ConnectKey) == 0 {
-		return echo.NewHTTPError(http.StatusInternalServerError, "connect key not available")
-	}
 	proxyReq.SetBasicAuth("", account.ConnectKey)
 
 	client := &http.Client{}
@@ -99,8 +94,6 @@ func (a *API) HandlePOSTAuthConnect(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to read response")
 	}
 
-	// Store requestID→userID mapping if approval was successful
-	// This allows the registration step to link the app to this user
 	if resp.StatusCode == http.StatusNoContent && reqBody.Approve {
 		if err := siaService.StoreAuthRequest(ctx, requestID, userID); err != nil {
 			a.Logger().Error("failed to store auth request mapping", zap.Error(err))
