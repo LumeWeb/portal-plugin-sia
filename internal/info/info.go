@@ -28,6 +28,7 @@ func GetPluginInfo() core.PluginInfo {
 	return core.PluginInfo{
 		ID:       internal.ProtocolName,
 		Version:  build.GetInfo(),
+		Depends:  []string{"quota"},
 		API:      api.NewAPI,
 		Protocol: protocol.NewProtocol,
 		Services: func() ([]core.ServiceInfo, error) {
