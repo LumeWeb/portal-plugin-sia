@@ -182,7 +182,7 @@ func NewAPI() (core.API, []core.ContextBuilderOption, error) {
 			svc.protocolConfig = core.GetProtocolConfig[*pluginConfig.ProtocolConfig](ctx, internal.ProtocolName)
 			svc.siaSvc = core.GetService[pluginCore.SiaService](ctx, pluginCore.SIA_SERVICE)
 
-			appURL := svc.resolveAppURL()
+			appURL := resolveAppURLFromCtx(ctx, svc.protocolConfig)
 			target, err := url.Parse(appURL)
 			if err != nil {
 				return err
@@ -215,6 +215,14 @@ func (a *API) resolveAppURL() string {
 	}
 	httpSvc := core.GetService[core.HTTPService](a.Context(), core.HTTP_SERVICE)
 	return httpSvc.APISubdomain(a.ID(), true)
+}
+
+func resolveAppURLFromCtx(ctx core.Context, protocolConfig *pluginConfig.ProtocolConfig) string {
+	if protocolConfig.AppURL != "" {
+		return protocolConfig.AppURL
+	}
+	httpSvc := core.GetService[core.HTTPService](ctx, core.HTTP_SERVICE)
+	return httpSvc.APISubdomain(internal.ProtocolName, true)
 }
 
 // buildAppURL constructs a URL to the indexd app API with the given path,
