@@ -13,7 +13,7 @@ func GetProtocolMock() coreTesting.TestContextBuilderOption {
 		protoMock := coreTesting.NewMockProtocol(ctx.T(), internal.ProtocolName)
 
 		protoMock.DisplayNameValue = internal.ProtocolDisplayName
-		protoMock.ConfigValue = config.ProtocolConfig{}
+		protoMock.ConfigValue = config.ProtocolConfig{AppURL: "http://localhost:8081"}
 
 		return protoMock
 	})

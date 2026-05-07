@@ -21,7 +21,7 @@ import (
 var TestOptions = coreTesting.CombineOptions(
 	coreTesting.WithServiceFactory(pluginCore.SIA_SERVICE, NewSiaService),
 	util.GetProtocolMock(),
-	coreTesting.WithProtocolConfig(internal.ProtocolName, &pluginConfig.ProtocolConfig{}),
+	coreTesting.WithProtocolConfig(internal.ProtocolName, &pluginConfig.ProtocolConfig{AppURL: "http://localhost:8081"}),
 	coreTesting.WithSQLitePluginMigrations(
 		internal.ProtocolName, migrations.GetSQLite(),
 	),

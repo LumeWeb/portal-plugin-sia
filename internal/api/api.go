@@ -182,12 +182,12 @@ func NewAPI() (core.API, []core.ContextBuilderOption, error) {
 			svc.protocolConfig = core.GetProtocolConfig[*pluginConfig.ProtocolConfig](ctx, internal.ProtocolName)
 			svc.siaSvc = core.GetService[pluginCore.SiaService](ctx, pluginCore.SIA_SERVICE)
 
-			proxyURL := resolveProxyURLFromCtx(ctx, svc.protocolConfig)
-			target, err := url.Parse(proxyURL)
+			httpSvc := core.GetService[core.HTTPService](ctx, core.HTTP_SERVICE)
+			target, err := url.Parse(svc.protocolConfig.AppURL)
 			if err != nil {
-				return err
+				return fmt.Errorf("invalid app_url: %w", err)
 			}
-			publicHost := resolvePublicHost(ctx)
+			publicHost := httpSvc.APISubdomain(internal.ProtocolName, false)
 			svc.proxy = &httputil.ReverseProxy{
 				Director: func(req *http.Request) {
 					req.URL.Scheme = target.Scheme
@@ -210,37 +210,13 @@ func (a *API) Name() string {
 	return internal.ProtocolName
 }
 
-// resolveProxyURL returns the internal indexd URL for proxying requests.
-// If AppURL is set, it's used as the proxy target (e.g. internal admin address).
-// Otherwise, falls back to the public subdomain URL.
 func (a *API) resolveProxyURL() string {
-	if a.protocolConfig.AppURL != "" {
-		return a.protocolConfig.AppURL
-	}
-	httpSvc := core.GetService[core.HTTPService](a.Context(), core.HTTP_SERVICE)
-	return httpSvc.APISubdomain(a.ID(), true)
+	return a.protocolConfig.AppURL
 }
 
-// resolveProxyURLFromCtx is the startup-time variant of resolveProxyURL.
-func resolveProxyURLFromCtx(ctx core.Context, protocolConfig *pluginConfig.ProtocolConfig) string {
-	if protocolConfig.AppURL != "" {
-		return protocolConfig.AppURL
-	}
-	httpSvc := core.GetService[core.HTTPService](ctx, core.HTTP_SERVICE)
-	return httpSvc.APISubdomain(internal.ProtocolName, true)
-}
-
-// resolvePublicHost returns the public hostname (no scheme) that clients
-// see and sign against. This must match indexd's advertiseURL host.
 func (a *API) resolvePublicHost() string {
 	httpSvc := core.GetService[core.HTTPService](a.Context(), core.HTTP_SERVICE)
 	return httpSvc.APISubdomain(a.ID(), false)
-}
-
-// resolvePublicHost is the startup-time variant that accepts a core.Context.
-func resolvePublicHost(ctx core.Context) string {
-	httpSvc := core.GetService[core.HTTPService](ctx, core.HTTP_SERVICE)
-	return httpSvc.APISubdomain(internal.ProtocolName, false)
 }
 
 // buildAppURL constructs a URL to the indexd app API with the given path,

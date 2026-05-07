@@ -10,10 +10,10 @@ require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/stretchr/testify v1.11.1
 	go.lumeweb.com/configmanager v0.3.28
-	go.lumeweb.com/portal v0.4.2-0.20260504090050-aa5840e6247b
+	go.lumeweb.com/portal v0.4.2-0.20260507082713-5ba1ddbe409a
 	go.lumeweb.com/portal-middleware v0.3.7
 	go.lumeweb.com/portal-plugin-quota v0.0.0-20260425220337-a342aa31f1f8
-	go.lumeweb.com/portal-router v0.6.15
+	go.lumeweb.com/portal-router v0.6.16
 	go.sia.tech/core v0.20.0
 	go.sia.tech/coreutils v0.21.3
 	go.sia.tech/indexd v0.1.1-0.20260410081129-29ab0c1887a1
@@ -44,7 +44,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.9.15 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.23 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.19.23 // indirect
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.100.1 // indirect
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.101.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/signin v1.0.11 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.30.17 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.21 // indirect
