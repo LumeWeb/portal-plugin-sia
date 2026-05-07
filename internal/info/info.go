@@ -8,6 +8,7 @@ import (
 	"go.lumeweb.com/portal-plugin-sia/internal/api"
 	"go.lumeweb.com/portal-plugin-sia/internal/cron"
 	"go.lumeweb.com/portal-plugin-sia/internal/db"
+	"go.lumeweb.com/portal-plugin-sia/internal/db/migrations"
 	"go.lumeweb.com/portal-plugin-sia/internal/protocol"
 	quotaService "go.lumeweb.com/portal-plugin-sia/internal/service/quota"
 	siaService "go.lumeweb.com/portal-plugin-sia/internal/service/sia"
@@ -51,6 +52,10 @@ func GetPluginInfo() core.PluginInfo {
 			&db.SiaAppAccount{},
 			&db.AuthRequest{},
 			&db.FundingCursor{},
+		},
+		Migrations: core.DBMigration{
+			core.DB_TYPE_SQLITE: migrations.GetSQLite(),
+			core.DB_TYPE_MYSQL:  migrations.GetMySQL(),
 		},
 		Metrics: GetCollectors(),
 		CronJobs: []core.PluginCronJob{
