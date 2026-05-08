@@ -60,14 +60,14 @@ func GetPluginInfo() core.PluginInfo {
 		Metrics: GetCollectors(),
 		CronJobs: []core.PluginCronJob{
 			{
-				Name: "sia.funding_sync",
+				Name: "funding_sync",
 				Factory: func() (core.CronJob, error) {
 					return cron.NewSyncFundingJob(), nil
 				},
 				Schedule: core.NewCronScheduleDefinition(core.CronScheduleTypeCron).WithCronExpression(internal.FundingSyncCronSchedule),
 			},
 			{
-				Name: "sia.auth_request_cleanup",
+				Name: "auth_request_cleanup",
 				Factory: func() (core.CronJob, error) {
 					return cron.NewAuthRequestCleanupJob(), nil
 				},
