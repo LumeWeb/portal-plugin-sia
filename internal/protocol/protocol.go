@@ -1,16 +1,19 @@
 package protocol
 
 import (
+	"context"
 	"fmt"
 	"io"
 
 	mh "github.com/multiformats/go-multihash"
 	"go.lumeweb.com/portal/config"
 	core "go.lumeweb.com/portal/core"
+	"go.lumeweb.com/portal/db/models/data_models"
 
 	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
 	"go.lumeweb.com/portal-plugin-sia/internal"
 	pluginConfig "go.lumeweb.com/portal-plugin-sia/internal/config"
+	"gorm.io/gorm"
 )
 
 type Protocol struct {
@@ -18,9 +21,51 @@ type Protocol struct {
 	siaService pluginCore.SiaService
 }
 
+type pinHandler struct{}
+
+func (p pinHandler) CreateProtocolPin(ctx context.Context, id uint, data any) error {
+	_, span := core.TraceMethod(ctx, "pinHandler.CreateProtocolPin")
+	defer span.End()
+	return nil
+}
+
+func (p pinHandler) GetProtocolPin(ctx context.Context, tx *gorm.DB, id uint) (any, error) {
+	_, span := core.TraceMethod(ctx, "pinHandler.GetProtocolPin")
+	defer span.End()
+	return nil, nil
+}
+
+func (p pinHandler) UpdateProtocolPin(ctx context.Context, id uint, data any) error {
+	_, span := core.TraceMethod(ctx, "pinHandler.UpdateProtocolPin")
+	defer span.End()
+	return nil
+}
+
+func (p pinHandler) DeleteProtocolPin(ctx context.Context, id uint) error {
+	_, span := core.TraceMethod(ctx, "pinHandler.DeleteProtocolPin")
+	defer span.End()
+	return nil
+}
+
+func (p pinHandler) QueryProtocolPin(ctx context.Context, query any) *gorm.DB {
+	_, span := core.TraceMethod(ctx, "pinHandler.QueryProtocolPin")
+	defer span.End()
+	return nil
+}
+
+func (p pinHandler) GetProtocolPinModel() data_models.PinDataModel {
+	return nil
+}
+
+func (p Protocol) PinHandler() core.ProtocolPinHandler {
+	return &pinHandler{}
+}
+
 var (
-	_ core.Protocol        = (*Protocol)(nil)
-	_ core.StorageProtocol = (*Protocol)(nil)
+	_ core.Protocol              = (*Protocol)(nil)
+	_ core.StorageProtocol       = (*Protocol)(nil)
+	_ core.ProtocolGetPinHandler = (*Protocol)(nil)
+	_ core.ProtocolPinHandler    = (*pinHandler)(nil)
 )
 
 func (p *Protocol) EncodeFileName(hash core.StorageHash) string {
