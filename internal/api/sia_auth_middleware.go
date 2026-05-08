@@ -77,7 +77,7 @@ func SiaSignedURLMiddleware(siaService pluginCore.SiaService, hostname string) e
 				return echo.NewHTTPError(http.StatusUnauthorized, "unknown account")
 			}
 
-			siaAccount, err := siaService.GetAccount(req.Context(), appAccount.SiaAccountID)
+			siaAccount, err := siaService.GetAccountByID(req.Context(), appAccount.SiaAccountID)
 			if err != nil {
 				return echo.NewHTTPError(http.StatusUnauthorized, "unknown sia account")
 			}
