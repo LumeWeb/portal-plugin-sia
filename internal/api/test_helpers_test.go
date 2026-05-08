@@ -251,7 +251,7 @@ func (m *mockHelper) setupSignedAccount() (types.PrivateKey, uint) {
 			AccountKey:   db.DBAccountKeyFromPublicKey(pk),
 		}, nil).Maybe()
 
-	mockSiaService.EXPECT().GetAccount(mock.Anything, uint(1)).Return(
+	mockSiaService.EXPECT().GetAccountByID(mock.Anything, uint(1)).Return(
 		createMockSiaAccount(TestUserID, TestAccountKey, TestConnectKey, TestQuotaKey), nil).Maybe()
 
 	// Setup indexd object/slab management expectations

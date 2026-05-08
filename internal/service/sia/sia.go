@@ -251,6 +251,20 @@ func (s *SiaService) GetAccount(ctx context.Context, userID uint) (*siaDB.SiaAcc
 	)
 }
 
+func (s *SiaService) GetAccountByID(ctx context.Context, id uint) (*siaDB.SiaAccount, error) {
+	ctx, span := core.TraceMethod(ctx, "SiaService.GetAccountByID")
+	defer span.End()
+
+	var account siaDB.SiaAccount
+	err := db.RetryableComponentLock(s, func(tx *gorm.DB) *gorm.DB {
+		return tx.First(&account, id)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &account, nil
+}
+
 func (s *SiaService) AccountExists(ctx context.Context, userID uint) (bool, error) {
 	ctx, span := core.TraceMethod(ctx, "SiaService.AccountExists")
 	defer span.End()
