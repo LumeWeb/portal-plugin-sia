@@ -197,9 +197,7 @@ func TestMain(m *testing.M) {
 
 	// POST /auth/connect/{requestID}/register - Register Connection
 	mux.HandleFunc("POST /auth/connect/{requestID}/register", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(nil)
+		w.WriteHeader(http.StatusNoContent)
 	})
 
 	// POST /auth/connect/{requestID} - Approve/Reject Connection (basic auth)
@@ -214,8 +212,7 @@ func TestMain(m *testing.M) {
 		if req.Approve {
 			w.WriteHeader(http.StatusNoContent)
 		} else {
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(nil)
+			w.WriteHeader(http.StatusNoContent)
 		}
 	})
 

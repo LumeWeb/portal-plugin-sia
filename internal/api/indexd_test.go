@@ -163,7 +163,7 @@ func TestAuthConnect_Reject(t *testing.T) {
 		reqBody := indexdApp.ApproveAppRequest{Approve: false}
 		resp := helper.makeAuthenticatedRequest(http.MethodPost, "/auth/connect/test-request-id", token, mustMarshalJSON(t, reqBody))
 
-		assert.Equal(t, http.StatusOK, resp.Code)
+		assert.Equal(t, http.StatusNoContent, resp.Code)
 	}, TestOptions)
 }
 
@@ -271,6 +271,6 @@ func TestAuthConnectRegister_Success(t *testing.T) {
 		}
 		resp := helper.makeRequest(http.MethodPost, "/auth/connect/test-request-id/register", mustMarshalJSON(t, reqBody))
 
-		assert.Equal(t, http.StatusOK, resp.Code)
+		assert.Equal(t, http.StatusNoContent, resp.Code)
 	}, TestOptions)
 }
