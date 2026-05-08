@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 
 	quotaCore "go.lumeweb.com/portal-plugin-quota/core"
 	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
@@ -99,10 +100,11 @@ func (s *QuotaService) ProvisionAccount(ctx context.Context, userID uint) error 
 			return nil
 		})
 
-			quotaReq := accounts.PutQuotaRequest{
-				Description:     fmt.Sprintf("Portal user %d", userID),
-				FundTargetBytes: &fundTargetBytes,
-			}
+		quotaReq := accounts.PutQuotaRequest{
+			Description:     fmt.Sprintf("Portal user %d", userID),
+			TotalUses:       math.MaxInt32,
+			FundTargetBytes: &fundTargetBytes,
+		}
 
 			if err := s.siaService.AdminClient().PutQuota(ctx, quotaKey, quotaReq); err != nil {
 				return fmt.Errorf("failed to create indexd quota: %w", err)
