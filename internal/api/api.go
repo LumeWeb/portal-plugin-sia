@@ -215,6 +215,41 @@ func (a *API) resolveProxyURL() string {
 	return a.protocolConfig.AppURL
 }
 
+// resolvePublicHost returns the hostname that indexd expects in the Host header.
+// Indexd validates jc.Request.Host against its advertiseURL hostname, which in
+// the deployed environment matches the portal's public subdomain (since all
+// requests route through the portal). Manual proxy requests must set this Host
+// header to pass indexd's hostname validation, even though they connect to the
+// internal AppURL target.
+func (a *API) resolvePublicHost() string {
+	httpSvc := core.GetService[core.HTTPService](a.Context(), core.HTTP_SERVICE)
+	host := httpSvc.APISubdomain(a.ID(), false)
+	return a.appendPort(host)
+}
+
+// resolvePublicURL returns the full public URL for this API, including scheme
+// and port (for non-standard ports). This is used for URLs returned to clients
+// that they must be able to reach directly (e.g. status URLs, redirects).
+func (a *API) resolvePublicURL() string {
+	httpSvc := core.GetService[core.HTTPService](a.Context(), core.HTTP_SERVICE)
+	url := httpSvc.APISubdomain(a.ID(), true)
+	return a.appendPort(url)
+}
+
+// appendPort appends the public-facing port to a base URL if it is non-standard
+// (not 80 or 443). It respects ExternalPort config when set.
+func (a *API) appendPort(base string) string {
+	port := uint16(a.Config().Config().Core.ExternalPort)
+	if port == 0 {
+		httpSvc := core.GetService[core.HTTPService](a.Context(), core.HTTP_SERVICE)
+		port = httpSvc.Port()
+	}
+	if port != 0 && port != 443 && port != 80 {
+		return fmt.Sprintf("%s:%d", base, port)
+	}
+	return base
+}
+
 // copyProxyResponseHeaders copies response headers from the upstream response
 // to the echo response, normalizing Content-Type to match what the indexd SDK
 // expects. The SDK does an exact string match on Content-Type against the

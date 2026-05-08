@@ -11,7 +11,6 @@ import (
 	"github.com/labstack/echo/v4"
 	indexdApp "go.sia.tech/indexd/api/app"
 
-	"go.lumeweb.com/portal/core"
 	"go.uber.org/zap"
 )
 
@@ -51,6 +50,7 @@ func (a *API) HandlePOSTAuthConnectInit(c echo.Context) error {
 	// Copy headers
 	proxyReq.Header.Set("Content-Type", c.Request().Header.Get("Content-Type"))
 	proxyReq.Header.Set("User-Agent", c.Request().Header.Get("User-Agent"))
+	proxyReq.Host = a.resolvePublicHost()
 
 	// Execute request
 	client := &http.Client{}
@@ -93,8 +93,7 @@ func (a *API) HandlePOSTAuthConnectInit(c echo.Context) error {
 	// Rewrite URLs to point to portal
 	// Original: <indexd.AdvertiseURL>/auth/connect/<requestID>
 	// Target:   <portal.URL>/auth/connect/<requestID>
-	httpSvc := core.GetService[core.HTTPService](a.Context(), core.HTTP_SERVICE)
-	portalBaseURL := httpSvc.APISubdomain(a.ID(), true)
+	portalBaseURL := a.resolvePublicURL()
 
 	registerResp.ResponseURL = fmt.Sprintf("%s/auth/connect/%s", portalBaseURL, requestID)
 	registerResp.StatusURL = fmt.Sprintf("%s/auth/connect/%s/status", portalBaseURL, requestID)

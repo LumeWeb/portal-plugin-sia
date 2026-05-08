@@ -78,6 +78,7 @@ func (a *API) HandlePOSTAuthConnect(c echo.Context) error {
 
 	proxyReq.Header.Set("Content-Type", c.Request().Header.Get("Content-Type"))
 	proxyReq.Header.Set("User-Agent", c.Request().Header.Get("User-Agent"))
+	proxyReq.Host = a.resolvePublicHost()
 	proxyReq.SetBasicAuth("", account.ConnectKey)
 
 	client := &http.Client{}
