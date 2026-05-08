@@ -22,7 +22,9 @@ import (
 	"go.lumeweb.com/portal-plugin-sia/internal"
 	pluginConfig "go.lumeweb.com/portal-plugin-sia/internal/config"
 	"go.lumeweb.com/portal-plugin-sia/internal/testing/mocks"
+	core "go.lumeweb.com/portal/core"
 	coreTesting "go.lumeweb.com/portal/core/testing"
+	"github.com/stretchr/testify/mock"
 )
 
 const (
@@ -262,9 +264,14 @@ func fakeIndexdAuthConnectHTML(name, description, logoURL, callbackURL string) s
 
 // TestOptions provides test configuration for API tests
 var TestOptions = coreTesting.CombineOptions(
+	coreTesting.WrapCoreOption(core.ContextWithStartupFunc(func(ctx core.Context) error {
+		mockHTTPSvc := coreTesting.GetMockHTTPService(ctx)
+		mockHTTPSvc.EXPECT().Port().Return(uint16(443)).Maybe()
+		mockHTTPSvc.EXPECT().APISubdomain(mock.AnythingOfType("string"), mock.AnythingOfType("bool")).Return("sia.example.com").Maybe()
+		return nil
+	})),
 	coreTesting.WithMockServiceFactory(pluginCore.SIA_SERVICE, mocks.NewMockSiaService),
 	coreTesting.WithMockServiceFactory(pluginCore.QUOTA_SERVICE, mocks.NewMockQuotaService),
-	coreTesting.WithHTTPService(),
 	coreTesting.WithPlugins(),
 	coreTesting.WithAPIConfig(internal.ProtocolName, &pluginConfig.APIConfig{}),
 )

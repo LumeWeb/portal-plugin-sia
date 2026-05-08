@@ -13,6 +13,7 @@ import (
 	quotaPkg "go.lumeweb.com/portal-plugin-sia/internal/quota"
 	core "go.lumeweb.com/portal/core"
 	db "go.lumeweb.com/portal/db"
+	"go.sia.tech/core/types"
 	"go.sia.tech/indexd/accounts"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -268,9 +269,7 @@ func (s *QuotaService) SyncFunding(ctx context.Context) error {
 
 				// 3. Process each event — look up account on-demand by AccountKey via SiaAppAccount join
 				for _, event := range events {
-					accountKeyStr := event.AccountKey.String()
-
-					appAccount, err := s.siaService.GetAppAccountByKey(ctx, accountKeyStr)
+					appAccount, err := s.siaService.GetAppAccountByKey(ctx, types.PublicKey(event.AccountKey))
 					if err != nil {
 						continue
 					}

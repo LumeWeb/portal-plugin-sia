@@ -11,7 +11,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 	mcontext "go.lumeweb.com/portal-middleware/context"
-	"go.lumeweb.com/portal/core"
 	"go.uber.org/zap"
 	"golang.org/x/net/html"
 
@@ -204,8 +203,7 @@ func (a *API) HandleGETAuthConnect(c echo.Context) error {
 
 	_, err = mcontext.GetUserID(c)
 	if err != nil {
-		httpSvc := core.GetService[core.HTTPService](a.Context(), core.HTTP_SERVICE)
-		dashboardURL := a.appendPort(httpSvc.APISubdomain("dashboard", true))
+		dashboardURL := a.appendPort(a.httpSvc.APISubdomain("dashboard", true))
 
 		dest, err := url.Parse(dashboardURL)
 		if err != nil {

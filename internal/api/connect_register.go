@@ -9,8 +9,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 	indexdApp "go.sia.tech/indexd/api/app"
-	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
-	"go.lumeweb.com/portal/core"
 	"go.uber.org/zap"
 )
 
@@ -73,24 +71,26 @@ func (a *API) HandlePOSTAuthConnectRegister(c echo.Context) error {
 	if resp.StatusCode == http.StatusNoContent {
 		var reqBody indexdApp.RegisterAppKeyRequest
 		if err := json.Unmarshal(body, &reqBody); err == nil {
-			siaService := core.GetService[pluginCore.SiaService](a.Context(), pluginCore.SIA_SERVICE)
+			siaService := a.siaSvc
 
 			authReq, err := siaService.GetAuthRequest(ctx, requestID)
 			if err != nil {
 				a.Logger().Error("failed to get auth request for app account registration",
 					zap.String("requestID", requestID), zap.Error(err))
 			} else {
-				accountKey := reqBody.AppKey.String()
-				if _, err := siaService.RegisterAppAccount(ctx, authReq.UserID, accountKey); err != nil {
+				siaAccount, err := siaService.GetAccount(ctx, authReq.UserID)
+				if err != nil {
+					a.Logger().Error("failed to get sia account for app account registration",
+						zap.Uint("userID", authReq.UserID), zap.Error(err))
+				} else if _, err := siaService.RegisterAppAccount(ctx, siaAccount.ID, reqBody.AppKey); err != nil {
 					a.Logger().Error("failed to register app account",
-						zap.Uint("userID", authReq.UserID),
-						zap.String("accountKey", accountKey),
+						zap.Uint("siaAccountID", siaAccount.ID),
 						zap.Error(err))
 				}
+			}
 
-				if err := siaService.DeleteAuthRequest(ctx, requestID); err != nil {
-					a.Logger().Warn("failed to delete auth request", zap.String("requestID", requestID), zap.Error(err))
-				}
+			if err := siaService.DeleteAuthRequest(ctx, requestID); err != nil {
+				a.Logger().Warn("failed to delete auth request", zap.String("requestID", requestID), zap.Error(err))
 			}
 		}
 	}

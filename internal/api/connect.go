@@ -9,8 +9,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 	mcontext "go.lumeweb.com/portal-middleware/context"
-	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
-	"go.lumeweb.com/portal/core"
 	"go.uber.org/zap"
 )
 
@@ -43,12 +41,11 @@ func (a *API) HandlePOSTAuthConnect(c echo.Context) error {
 
 	ctx := c.Request().Context()
 
-	siaService := core.GetService[pluginCore.SiaService](a.Context(), pluginCore.SIA_SERVICE)
+	siaService := a.siaSvc
 
 	account, err := siaService.GetAccount(ctx, userID)
 	if err != nil || len(account.ConnectKey) == 0 {
-		quotaSvc := core.GetService[pluginCore.QuotaService](a.Context(), pluginCore.QUOTA_SERVICE)
-		if err := quotaSvc.ProvisionAccount(ctx, userID); err != nil {
+		if err := a.quotaSvc.ProvisionAccount(ctx, userID); err != nil {
 			a.Logger().Error("failed to provision account", zap.Uint("userID", userID), zap.Error(err))
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to provision account")
 		}

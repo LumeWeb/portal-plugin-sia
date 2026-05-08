@@ -9,9 +9,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
-	"go.lumeweb.com/portal-plugin-sia/internal"
 	pluginConfig "go.lumeweb.com/portal-plugin-sia/internal/config"
 	siaDB "go.lumeweb.com/portal-plugin-sia/internal/db"
+	"go.lumeweb.com/portal-plugin-sia/internal"
 	"go.lumeweb.com/portal-plugin-sia/internal/events"
 	"go.lumeweb.com/portal-plugin-sia/internal/quota"
 	core "go.lumeweb.com/portal/core"
@@ -132,13 +132,13 @@ func (s *SiaService) AdminClient() pluginCore.AdminClient {
 	return s.adminClient
 }
 
-func (s *SiaService) RegisterAppAccount(ctx context.Context, siaAccountID uint, accountKey string) (*siaDB.SiaAppAccount, error) {
+func (s *SiaService) RegisterAppAccount(ctx context.Context, siaAccountID uint, accountKey types.PublicKey) (*siaDB.SiaAppAccount, error) {
 	ctx, span := core.TraceMethod(ctx, "SiaService.RegisterAppAccount")
 	defer span.End()
 
 	appAccount := &siaDB.SiaAppAccount{
 		SiaAccountID: siaAccountID,
-		AccountKey:   accountKey,
+		AccountKey:   siaDB.DBAccountKeyFromPublicKey(accountKey),
 	}
 
 	err := db.RetryableComponentTransaction(s, ctx, func(tx *gorm.DB) *gorm.DB {
@@ -158,13 +158,13 @@ func (s *SiaService) RegisterAppAccount(ctx context.Context, siaAccountID uint, 
 	return appAccount, nil
 }
 
-func (s *SiaService) GetAppAccountByKey(ctx context.Context, accountKey string) (*siaDB.SiaAppAccount, error) {
+func (s *SiaService) GetAppAccountByKey(ctx context.Context, accountKey types.PublicKey) (*siaDB.SiaAppAccount, error) {
 	ctx, span := core.TraceMethod(ctx, "SiaService.GetAppAccountByKey")
 	defer span.End()
 
 	var appAccount siaDB.SiaAppAccount
 	err := db.RetryableComponentLock(s, func(tx *gorm.DB) *gorm.DB {
-		return tx.Where("account_key = ?", accountKey).First(&appAccount)
+		return tx.Where("account_key = ?", siaDB.DBAccountKeyFromPublicKey(accountKey)).First(&appAccount)
 	})
 	if err != nil {
 		return nil, err
@@ -291,11 +291,7 @@ func (s *SiaService) DeleteAccount(ctx context.Context, userID uint) error {
 			}
 
 			for _, appAccount := range appAccounts {
-				var pk types.PublicKey
-				if err := pk.UnmarshalText([]byte(appAccount.AccountKey)); err != nil {
-					return fmt.Errorf("failed to parse account key: %w", err)
-				}
-				protoAccount := rhp.Account(pk)
+				protoAccount := rhp.Account(appAccount.AccountKey.PublicKey())
 				if err := s.adminClient.DeleteAccount(ctx, protoAccount); err != nil {
 					return fmt.Errorf("failed to delete indexd account: %w", err)
 				}

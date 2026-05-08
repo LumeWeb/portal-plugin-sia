@@ -24,7 +24,7 @@ func (SiaAccount) TableName() string {
 type SiaAppAccount struct {
 	gorm.Model
 	SiaAccountID uint
-	AccountKey   string
+	AccountKey   DBAccountKey
 }
 
 func (SiaAppAccount) TableName() string {

@@ -16,6 +16,7 @@ import (
 	indexdApp "go.sia.tech/indexd/api/app"
 	"go.sia.tech/core/types"
 	"go.sia.tech/indexd/slabs"
+	"gorm.io/gorm"
 )
 
 func TestPinSlab_Success(t *testing.T) {
@@ -260,7 +261,9 @@ func TestAuthConnectRegister_Success(t *testing.T) {
 			UserID:    TestUserID,
 		}
 		mockSiaService.EXPECT().GetAuthRequest(mock.Anything, "test-request-id").Return(authReq, nil)
-		mockSiaService.EXPECT().RegisterAppAccount(mock.Anything, TestUserID, mock.AnythingOfType("string")).Return(&db.SiaAppAccount{}, nil)
+		siaAccount := &db.SiaAccount{Model: gorm.Model{ID: 2}, UserID: TestUserID}
+		mockSiaService.EXPECT().GetAccount(mock.Anything, TestUserID).Return(siaAccount, nil)
+		mockSiaService.EXPECT().RegisterAppAccount(mock.Anything, uint(2), mock.AnythingOfType("types.PublicKey")).Return(&db.SiaAppAccount{}, nil)
 		mockSiaService.EXPECT().DeleteAuthRequest(mock.Anything, "test-request-id").Return(nil)
 
 		sk := types.GeneratePrivateKey()

@@ -12,6 +12,7 @@ import (
 	"go.lumeweb.com/portal-plugin-sia/internal/db"
 	"go.lumeweb.com/portal/config"
 	core0 "go.lumeweb.com/portal/core"
+	"go.sia.tech/core/types"
 	"gorm.io/gorm"
 )
 
@@ -891,7 +892,7 @@ func (_c *MockSiaService_GetAccount_Call) RunAndReturn(run func(ctx context.Cont
 }
 
 // GetAppAccountByKey provides a mock function for the type MockSiaService
-func (_mock *MockSiaService) GetAppAccountByKey(ctx context.Context, accountKey string) (*db.SiaAppAccount, error) {
+func (_mock *MockSiaService) GetAppAccountByKey(ctx context.Context, accountKey types.PublicKey) (*db.SiaAppAccount, error) {
 	ret := _mock.Called(ctx, accountKey)
 
 	if len(ret) == 0 {
@@ -900,17 +901,17 @@ func (_mock *MockSiaService) GetAppAccountByKey(ctx context.Context, accountKey 
 
 	var r0 *db.SiaAppAccount
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*db.SiaAppAccount, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.PublicKey) (*db.SiaAppAccount, error)); ok {
 		return returnFunc(ctx, accountKey)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *db.SiaAppAccount); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, types.PublicKey) *db.SiaAppAccount); ok {
 		r0 = returnFunc(ctx, accountKey)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*db.SiaAppAccount)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, types.PublicKey) error); ok {
 		r1 = returnFunc(ctx, accountKey)
 	} else {
 		r1 = ret.Error(1)
@@ -925,20 +926,20 @@ type MockSiaService_GetAppAccountByKey_Call struct {
 
 // GetAppAccountByKey is a helper method to define mock.On call
 //   - ctx context.Context
-//   - accountKey string
+//   - accountKey types.PublicKey
 func (_e *MockSiaService_Expecter) GetAppAccountByKey(ctx interface{}, accountKey interface{}) *MockSiaService_GetAppAccountByKey_Call {
 	return &MockSiaService_GetAppAccountByKey_Call{Call: _e.mock.On("GetAppAccountByKey", ctx, accountKey)}
 }
 
-func (_c *MockSiaService_GetAppAccountByKey_Call) Run(run func(ctx context.Context, accountKey string)) *MockSiaService_GetAppAccountByKey_Call {
+func (_c *MockSiaService_GetAppAccountByKey_Call) Run(run func(ctx context.Context, accountKey types.PublicKey)) *MockSiaService_GetAppAccountByKey_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 string
+		var arg1 types.PublicKey
 		if args[1] != nil {
-			arg1 = args[1].(string)
+			arg1 = args[1].(types.PublicKey)
 		}
 		run(
 			arg0,
@@ -953,7 +954,7 @@ func (_c *MockSiaService_GetAppAccountByKey_Call) Return(siaAppAccount *db.SiaAp
 	return _c
 }
 
-func (_c *MockSiaService_GetAppAccountByKey_Call) RunAndReturn(run func(ctx context.Context, accountKey string) (*db.SiaAppAccount, error)) *MockSiaService_GetAppAccountByKey_Call {
+func (_c *MockSiaService_GetAppAccountByKey_Call) RunAndReturn(run func(ctx context.Context, accountKey types.PublicKey) (*db.SiaAppAccount, error)) *MockSiaService_GetAppAccountByKey_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1502,7 +1503,7 @@ func (_c *MockSiaService_RegisterAccount_Call) RunAndReturn(run func(ctx context
 }
 
 // RegisterAppAccount provides a mock function for the type MockSiaService
-func (_mock *MockSiaService) RegisterAppAccount(ctx context.Context, siaAccountID uint, accountKey string) (*db.SiaAppAccount, error) {
+func (_mock *MockSiaService) RegisterAppAccount(ctx context.Context, siaAccountID uint, accountKey types.PublicKey) (*db.SiaAppAccount, error) {
 	ret := _mock.Called(ctx, siaAccountID, accountKey)
 
 	if len(ret) == 0 {
@@ -1511,17 +1512,17 @@ func (_mock *MockSiaService) RegisterAppAccount(ctx context.Context, siaAccountI
 
 	var r0 *db.SiaAppAccount
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, uint, string) (*db.SiaAppAccount, error)); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uint, types.PublicKey) (*db.SiaAppAccount, error)); ok {
 		return returnFunc(ctx, siaAccountID, accountKey)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, uint, string) *db.SiaAppAccount); ok {
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uint, types.PublicKey) *db.SiaAppAccount); ok {
 		r0 = returnFunc(ctx, siaAccountID, accountKey)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*db.SiaAppAccount)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, uint, string) error); ok {
+	if returnFunc, ok := ret.Get(1).(func(context.Context, uint, types.PublicKey) error); ok {
 		r1 = returnFunc(ctx, siaAccountID, accountKey)
 	} else {
 		r1 = ret.Error(1)
@@ -1537,12 +1538,12 @@ type MockSiaService_RegisterAppAccount_Call struct {
 // RegisterAppAccount is a helper method to define mock.On call
 //   - ctx context.Context
 //   - siaAccountID uint
-//   - accountKey string
+//   - accountKey types.PublicKey
 func (_e *MockSiaService_Expecter) RegisterAppAccount(ctx interface{}, siaAccountID interface{}, accountKey interface{}) *MockSiaService_RegisterAppAccount_Call {
 	return &MockSiaService_RegisterAppAccount_Call{Call: _e.mock.On("RegisterAppAccount", ctx, siaAccountID, accountKey)}
 }
 
-func (_c *MockSiaService_RegisterAppAccount_Call) Run(run func(ctx context.Context, siaAccountID uint, accountKey string)) *MockSiaService_RegisterAppAccount_Call {
+func (_c *MockSiaService_RegisterAppAccount_Call) Run(run func(ctx context.Context, siaAccountID uint, accountKey types.PublicKey)) *MockSiaService_RegisterAppAccount_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -1552,9 +1553,9 @@ func (_c *MockSiaService_RegisterAppAccount_Call) Run(run func(ctx context.Conte
 		if args[1] != nil {
 			arg1 = args[1].(uint)
 		}
-		var arg2 string
+		var arg2 types.PublicKey
 		if args[2] != nil {
-			arg2 = args[2].(string)
+			arg2 = args[2].(types.PublicKey)
 		}
 		run(
 			arg0,
@@ -1570,7 +1571,7 @@ func (_c *MockSiaService_RegisterAppAccount_Call) Return(siaAppAccount *db.SiaAp
 	return _c
 }
 
-func (_c *MockSiaService_RegisterAppAccount_Call) RunAndReturn(run func(ctx context.Context, siaAccountID uint, accountKey string) (*db.SiaAppAccount, error)) *MockSiaService_RegisterAppAccount_Call {
+func (_c *MockSiaService_RegisterAppAccount_Call) RunAndReturn(run func(ctx context.Context, siaAccountID uint, accountKey types.PublicKey) (*db.SiaAppAccount, error)) *MockSiaService_RegisterAppAccount_Call {
 	_c.Call.Return(run)
 	return _c
 }
