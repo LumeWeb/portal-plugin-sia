@@ -70,7 +70,7 @@ func (a *API) HandlePOSTAuthConnectRegister(c echo.Context) error {
 	}
 
 	// On success from indexd, create the app account record
-	if resp.StatusCode == http.StatusOK {
+	if resp.StatusCode == http.StatusNoContent {
 		var reqBody indexdApp.RegisterAppKeyRequest
 		if err := json.Unmarshal(body, &reqBody); err == nil {
 			siaService := core.GetService[pluginCore.SiaService](a.Context(), pluginCore.SIA_SERVICE)

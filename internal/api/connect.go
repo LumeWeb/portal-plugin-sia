@@ -95,13 +95,15 @@ func (a *API) HandlePOSTAuthConnect(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to read response")
 	}
 
-	if resp.StatusCode == http.StatusNoContent && reqBody.Approve {
-		if err := siaService.StoreAuthRequest(ctx, requestID, userID); err != nil {
-			a.Logger().Error("failed to store auth request mapping", zap.Error(err))
-		}
-	} else if resp.StatusCode == http.StatusOK && !reqBody.Approve {
-		if err := siaService.DeleteAuthRequest(ctx, requestID); err != nil {
-			a.Logger().Error("failed to delete rejected auth request", zap.Error(err))
+	if resp.StatusCode == http.StatusNoContent {
+		if reqBody.Approve {
+			if err := siaService.StoreAuthRequest(ctx, requestID, userID); err != nil {
+				a.Logger().Error("failed to store auth request mapping", zap.Error(err))
+			}
+		} else {
+			if err := siaService.DeleteAuthRequest(ctx, requestID); err != nil {
+				a.Logger().Error("failed to delete rejected auth request", zap.Error(err))
+			}
 		}
 	}
 
