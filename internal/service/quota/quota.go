@@ -103,6 +103,7 @@ func (s *QuotaService) ProvisionAccount(ctx context.Context, userID uint) error 
 
 		quotaReq := accounts.PutQuotaRequest{
 			Description:     fmt.Sprintf("Portal user %d", userID),
+			MaxPinnedData:   math.MaxInt64,
 			TotalUses:       math.MaxInt32,
 			FundTargetBytes: &fundTargetBytes,
 		}
