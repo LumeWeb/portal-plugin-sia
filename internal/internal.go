@@ -8,7 +8,7 @@ const (
 )
 
 const (
-	FundingSyncCronSchedule        = "0 * * * *"
+	FundingSyncCronSchedule        = "*/5 * * * *"
 	AuthRequestCleanupCronSchedule = "*/5 * * * *"
 	AuthRequestTTL                 = 10 * time.Minute
 )
