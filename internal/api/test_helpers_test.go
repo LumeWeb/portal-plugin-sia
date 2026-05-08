@@ -48,10 +48,20 @@ type mockHelper struct {
 }
 
 func newMockHelper(t *testing.T, ctx coreTesting.TestContext) *mockHelper {
-	return &mockHelper{
+	helper := &mockHelper{
 		ctx: ctx,
 		t:   t,
 	}
+	helper.setupHTTPServiceMocks()
+	return helper
+}
+
+// setupHTTPServiceMocks configures HTTP service mock expectations needed
+// by API struct methods (resolvePublicHost, resolvePublicURL, appendPort).
+func (m *mockHelper) setupHTTPServiceMocks() {
+	mockHTTPSvc := coreTesting.GetMockHTTPService(m.ctx)
+	mockHTTPSvc.EXPECT().Port().Return(uint16(443)).Maybe()
+	mockHTTPSvc.EXPECT().APISubdomain(mock.AnythingOfType("string"), mock.AnythingOfType("bool")).Return("sia.example.com").Maybe()
 }
 
 // createMockSiaAccount creates a standardized SiaAccount mock object
@@ -232,14 +242,13 @@ func (m *mockHelper) setupSignedAccount() (types.PrivateKey, uint) {
 	sk := types.GeneratePrivateKey()
 
 	pk := sk.PublicKey()
-	accountKeyStr := base64.URLEncoding.EncodeToString(pk[:])
 
 	mockSiaService := core.GetService[*siaMocks.MockSiaService](m.ctx, pluginCore.SIA_SERVICE)
-	mockSiaService.EXPECT().GetAppAccountByKey(mock.Anything, accountKeyStr).Return(
+	mockSiaService.EXPECT().GetAppAccountByKey(mock.Anything, pk).Return(
 		&db.SiaAppAccount{
 			Model:        gorm.Model{ID: 1},
 			SiaAccountID: 1,
-			AccountKey:   accountKeyStr,
+			AccountKey:   db.DBAccountKeyFromPublicKey(pk),
 		}, nil).Maybe()
 
 	mockSiaService.EXPECT().GetAccount(mock.Anything, uint(1)).Return(

@@ -52,7 +52,7 @@ var proxyRouteDefinitions = []routeDef{
 		method:  http.MethodGet,
 		path:    "/account",
 		summary: "Retrieve account details",
-		desc:    "Retrieves details of the current authenticated account including used storage, remaining storage, and account status.",
+		desc:    "Details of the authenticated account including storage usage and account status.",
 		tags:    []string{tagAccounts},
 		swagger: []router.SwaggerOption{
 			router.WithSuccessResponse(http.StatusOK, "Account details",
@@ -64,12 +64,12 @@ var proxyRouteDefinitions = []routeDef{
 		method:  http.MethodGet,
 		path:    "/hosts",
 		summary: "List usable hosts",
-		desc:    "Returns a list of usable hosts on the Sia network with their addresses and geographic information. Can be filtered by protocol.",
+		desc:    "Usable hosts on the Sia network, filterable by protocol.",
 		tags:    []string{tagHosts},
 		swagger: []router.SwaggerOption{
-			router.WithQueryParam("limit", "Maximum number of hosts to return (1-500, default 100)", int(100)),
-			router.WithQueryParam("offset", "Number of hosts to skip (default 0)", int(0)),
-			router.WithQueryParam("protocol", "Filter hosts by protocol (siamux or quic)", ""),
+			router.WithQueryParam("limit", "Max results (1-500)", int(100)),
+			router.WithQueryParam("offset", "Results to skip", int(0)),
+			router.WithQueryParam("protocol", "Filter by protocol (siamux or quic)", ""),
 			router.WithSuccessResponse(http.StatusOK, "List of usable hosts",
 				router.WithJSONContent(struct {
 					Hosts []hosts.HostInfo `json:"hosts"`
@@ -81,12 +81,12 @@ var proxyRouteDefinitions = []routeDef{
 		method:  http.MethodGet,
 		path:    "/objects",
 		summary: "List all objects",
-		desc:    "Lists all objects for the authenticated account with pagination. Returns object events including deleted objects.",
+		desc:    "Objects for the authenticated account with pagination.",
 		tags:    []string{tagObjects},
 		swagger: []router.SwaggerOption{
-			router.WithQueryParam("limit", "Maximum number of objects to return (1-500, default 100)", int(100)),
-			router.WithQueryParam("key", "Object key to use as pagination offset (256-bit hash)", ""),
-			router.WithQueryParam("after", "Timestamp to use as pagination offset (RFC3339 format)", ""),
+			router.WithQueryParam("limit", "Max results (1-500)", int(100)),
+			router.WithQueryParam("key", "Pagination offset key", ""),
+			router.WithQueryParam("after", "Pagination offset timestamp (RFC3339)", ""),
 			router.WithSuccessResponse(http.StatusOK, "List of object events",
 				router.WithJSONContent(dto.ObjectListResponse{}),
 			),
@@ -96,10 +96,10 @@ var proxyRouteDefinitions = []routeDef{
 		method:  http.MethodGet,
 		path:    "/objects/:key",
 		summary: "Get object details",
-		desc:    "Retrieves details of a specific object by its key. Returns the sealed object with encrypted data key and slab information.",
+		desc:    "Details of an object by its key.",
 		tags:    []string{tagObjects},
 		swagger: []router.SwaggerOption{
-			router.WithPathParam("key", "Object key identifier (256-bit hash)", ""),
+			router.WithPathParam("key", "Object key", ""),
 			router.WithSuccessResponse(http.StatusOK, "Object details",
 				router.WithJSONContent(slabs.SealedObject{}),
 			),
@@ -109,10 +109,10 @@ var proxyRouteDefinitions = []routeDef{
 		method:  http.MethodGet,
 		path:    "/objects/:key/shared",
 		summary: "Get shared object",
-		desc:    "Retrieves a shared object that can be accessed without account context. Contains all information needed to retrieve and decrypt the object.",
+		desc:    "A shared object accessible without account context.",
 		tags:    []string{tagObjects},
 		swagger: []router.SwaggerOption{
-			router.WithPathParam("key", "Object key identifier (256-bit hash)", ""),
+			router.WithPathParam("key", "Object key", ""),
 			router.WithSuccessResponse(http.StatusOK, "Shared object",
 				router.WithJSONContent(slabs.SharedObject{}),
 			),
@@ -127,11 +127,11 @@ var proxyRouteDefinitions = []routeDef{
 		method:  http.MethodGet,
 		path:    "/slabs",
 		summary: "List all pinned slabs",
-		desc:    "Lists all slab IDs pinned by the authenticated account with pagination.",
+		desc:    "Slab IDs pinned by the authenticated account with pagination.",
 		tags:    []string{tagSlabs},
 		swagger: []router.SwaggerOption{
-			router.WithQueryParam("limit", "Maximum number of slab IDs to return (1-500, default 100)", int(100)),
-			router.WithQueryParam("offset", "Number of slab IDs to skip (default 0)", int(0)),
+			router.WithQueryParam("limit", "Max results (1-500)", int(100)),
+			router.WithQueryParam("offset", "Results to skip", int(0)),
 			router.WithSuccessResponse(http.StatusOK, "List of pinned slabs",
 				router.WithJSONContent(struct {
 					Slabs []slabs.SlabID `json:"slabs"`
@@ -143,10 +143,10 @@ var proxyRouteDefinitions = []routeDef{
 		method:  http.MethodGet,
 		path:    "/slabs/:slabid",
 		summary: "Get slab details",
-		desc:    "Retrieves details of a specific pinned slab including encryption key, minimum shards, and sector locations.",
+		desc:    "Details of a pinned slab including encryption key, minimum shards, and sector locations.",
 		tags:    []string{tagSlabs},
 		swagger: []router.SwaggerOption{
-			router.WithPathParam("slabid", "Slab ID (256-bit hash)", ""),
+			router.WithPathParam("slabid", "Slab ID", ""),
 			router.WithSuccessResponse(http.StatusOK, "Slab details",
 				router.WithJSONContent(slabs.PinnedSlab{}),
 			),
@@ -155,18 +155,6 @@ var proxyRouteDefinitions = []routeDef{
 			),
 		},
 	},
-
-	{
-		method:  http.MethodGet,
-		path:    "/auth/check",
-		summary: "Check application authentication",
-		desc:    "Checks if the application is authenticated with a valid signature.",
-		tags:    []string{tagAuth},
-		swagger: []router.SwaggerOption{
-			router.WithSuccessResponse(http.StatusNoContent, "Application is authenticated"),
-		},
-	},
-
 }
 
 type API struct {
@@ -174,6 +162,10 @@ type API struct {
 	protocolConfig *pluginConfig.ProtocolConfig
 	proxy          http.Handler
 	siaSvc         pluginCore.SiaService
+	httpSvc        core.HTTPService
+	pinSvc         core.PinService
+	uploadSvc      core.UploadService
+	quotaSvc       pluginCore.QuotaService
 }
 
 func NewAPI() (core.API, []core.ContextBuilderOption, error) {
@@ -182,13 +174,16 @@ func NewAPI() (core.API, []core.ContextBuilderOption, error) {
 		core.ContextWithStartupFunc(func(ctx core.Context) error {
 			svc.protocolConfig = core.GetProtocolConfig[*pluginConfig.ProtocolConfig](ctx, internal.ProtocolName)
 			svc.siaSvc = core.GetService[pluginCore.SiaService](ctx, pluginCore.SIA_SERVICE)
+			svc.httpSvc = core.GetService[core.HTTPService](ctx, core.HTTP_SERVICE)
+			svc.pinSvc = core.GetService[core.PinService](ctx, core.PIN_SERVICE)
+			svc.uploadSvc = core.GetService[core.UploadService](ctx, core.UPLOAD_SERVICE)
+			svc.quotaSvc = core.GetService[pluginCore.QuotaService](ctx, pluginCore.QUOTA_SERVICE)
 
-			httpSvc := core.GetService[core.HTTPService](ctx, core.HTTP_SERVICE)
 			target, err := url.Parse(svc.protocolConfig.AppURL)
 			if err != nil {
 				return fmt.Errorf("invalid app_url: %w", err)
 			}
-			publicHost := httpSvc.APISubdomain(internal.ProtocolName, false)
+			publicHost := svc.httpSvc.APISubdomain(internal.ProtocolName, false)
 			svc.proxy = &httputil.ReverseProxy{
 				Director: func(req *http.Request) {
 					req.URL.Scheme = target.Scheme
@@ -222,8 +217,7 @@ func (a *API) resolveProxyURL() string {
 // header to pass indexd's hostname validation, even though they connect to the
 // internal AppURL target.
 func (a *API) resolvePublicHost() string {
-	httpSvc := core.GetService[core.HTTPService](a.Context(), core.HTTP_SERVICE)
-	host := httpSvc.APISubdomain(a.ID(), false)
+	host := a.httpSvc.APISubdomain(a.ID(), false)
 	return a.appendPort(host)
 }
 
@@ -231,8 +225,7 @@ func (a *API) resolvePublicHost() string {
 // and port (for non-standard ports). This is used for URLs returned to clients
 // that they must be able to reach directly (e.g. status URLs, redirects).
 func (a *API) resolvePublicURL() string {
-	httpSvc := core.GetService[core.HTTPService](a.Context(), core.HTTP_SERVICE)
-	url := httpSvc.APISubdomain(a.ID(), true)
+	url := a.httpSvc.APISubdomain(a.ID(), true)
 	return a.appendPort(url)
 }
 
@@ -241,8 +234,7 @@ func (a *API) resolvePublicURL() string {
 func (a *API) appendPort(base string) string {
 	port := uint16(a.Config().Config().Core.ExternalPort)
 	if port == 0 {
-		httpSvc := core.GetService[core.HTTPService](a.Context(), core.HTTP_SERVICE)
-		port = httpSvc.Port()
+		port = a.httpSvc.Port()
 	}
 	if port != 0 && port != 443 && port != 80 {
 		return fmt.Sprintf("%s:%d", base, port)
@@ -301,8 +293,7 @@ func (a *API) OpenAPIInfo() router.APIInfoDefinition {
 }
 
 func (a *API) Configure(r router.Router, accessSvc core.AccessService) error {
-	httpSvc := core.GetService[core.HTTPService](a.Context(), core.HTTP_SERVICE)
-	siaMw := SiaSignedURLMiddleware(a.Context(), httpSvc.APISubdomain(a.ID(), false))
+	siaMw := SiaSignedURLMiddleware(a.siaSvc, a.resolvePublicHost())
 
 	siaOpts := []router.RouteOption{
 		router.WithMiddlewares(siaMw),
@@ -343,9 +334,9 @@ func (a *API) Configure(r router.Router, accessSvc core.AccessService) error {
 			)),
 			router.WithSwagger(
 				router.WithSummary("Get connection request UI"),
-				router.WithDescription("Returns an HTML page for the user to approve or reject the application connection request. Unauthenticated users are redirected to the portal login page."),
+				router.WithDescription("Authorization page for the user to approve or reject the connection request. Unauthenticated users are redirected to login."),
 				router.WithTags(tagAuth),
-				router.WithPathParam("requestID", "Connect request ID", ""),
+				router.WithPathParam("requestID", "Request ID", ""),
 				router.WithSuccessResponse(http.StatusOK, "HTML authorization page"),
 				router.WithErrorResponses(
 					router.DefineSwaggerErrorResponse(http.StatusNotFound, "Unknown request ID"),
@@ -355,9 +346,9 @@ func (a *API) Configure(r router.Router, accessSvc core.AccessService) error {
 		router.NewRoute(http.MethodGet, "/auth/connect/:requestID/status", echo.WrapHandler(a.proxy),
 			router.WithSwagger(
 				router.WithSummary("Check connection request status"),
-				router.WithDescription("Returns whether the user has approved or rejected the connection request. If approved, includes the userSecret used to derive the application key."),
+				router.WithDescription("Returns approval status and userSecret if approved."),
 				router.WithTags(tagAuth),
-				router.WithPathParam("requestID", "Connect request ID", ""),
+				router.WithPathParam("requestID", "Request ID", ""),
 				router.WithSuccessResponse(http.StatusOK, "Connection request status",
 					router.WithJSONContent(indexdApp.AuthConnectStatusResponse{}),
 				),
@@ -369,8 +360,16 @@ func (a *API) Configure(r router.Router, accessSvc core.AccessService) error {
 	}
 	router.RegisterRoutes(r, accessSvc, a.Subdomain(), connectPublicRoutes)
 
-	// Signed-only routes (no JWT auth required)
+	// Signed-only routes (no portal JWT auth required — indexd validates signed URL)
 	signedRoutes := []router.RouteDefinition{
+		router.NewRoute(http.MethodGet, "/auth/check", echo.WrapHandler(a.proxy),
+			router.WithSwagger(
+				router.WithSummary("Check application authentication"),
+				router.WithDescription("Verifies the application is authenticated with a valid signed URL."),
+				router.WithTags(tagAuth),
+				router.WithSuccessResponse(http.StatusNoContent, "Application is authenticated"),
+			),
+		),
 		router.NewRoute(http.MethodPost, "/auth/connect", a.HandlePOSTAuthConnectInit),
 	}
 	router.RegisterRoutes(r, accessSvc, a.Subdomain(), signedRoutes)
@@ -382,10 +381,10 @@ func buildPinnedSlabRoute(a *API) router.RouteDefinition {
 	return router.NewRoute(http.MethodPost, "/slabs", a.pinSlabHandler,
 		router.WithAccess(core.ACCESS_USER_ROLE),
 		router.WithSwagger(
-			router.WithSummary("Pin a slab to the indexer"),
-			router.WithDescription("Pins a slab to the indexer for storage on the Sia network. The slab must include encryption parameters and sector locations."),
+			router.WithSummary("Pin a slab"),
+			router.WithDescription("Pins a slab for storage on the Sia network."),
 			router.WithTags(tagSlabs),
-			router.WithRequestBody(slabs.SlabPinParams{}, "Slab pinning parameters including encryption key, min shards, and sector locations", true),
+			router.WithRequestBody(slabs.SlabPinParams{}, "Slab pinning parameters", true),
 			router.WithSuccessResponse(http.StatusCreated, "Slab pinned successfully",
 				router.WithJSONContent(struct {
 					SlabID slabs.SlabID `json:"slabID"`
@@ -403,7 +402,7 @@ func buildPruneSlabsRoute(a *API) router.RouteDefinition {
 		router.WithAccess(core.ACCESS_USER_ROLE),
 		router.WithSwagger(
 			router.WithSummary("Prune unused slabs"),
-			router.WithDescription("Unpins all slabs not referenced by any object currently pinned by the user. This frees up storage quota."),
+			router.WithDescription("Unpins all slabs not referenced by any pinned object, freeing storage quota."),
 			router.WithTags(tagSlabs),
 			router.WithSuccessResponse(http.StatusOK, "Slabs pruned successfully"),
 		),
@@ -414,10 +413,10 @@ func buildDeleteSlabRoute(a *API) router.RouteDefinition {
 	return router.NewRoute(http.MethodDelete, "/slabs/:id", a.unpinSlabHandler,
 		router.WithAccess(core.ACCESS_USER_ROLE),
 		router.WithSwagger(
-			router.WithSummary("Unpin a slab from the indexer"),
-			router.WithDescription("Unpins a slab from the indexer. If the slab is no longer referenced by any objects, it will be removed."),
+			router.WithSummary("Unpin a slab"),
+			router.WithDescription("Unpins a slab. If no objects reference it, it will be removed."),
 			router.WithTags(tagSlabs),
-			router.WithPathParam("id", "Slab ID (256-bit hash)", ""),
+			router.WithPathParam("id", "Slab ID", ""),
 			router.WithSuccessResponse(http.StatusNoContent, "Slab unpinned successfully"),
 			router.WithErrorResponses(
 				router.DefineSwaggerErrorResponse(http.StatusNotFound, "Slab not found"),
@@ -431,7 +430,7 @@ func buildPinObjectRoute(a *API) router.RouteDefinition {
 		router.WithAccess(core.ACCESS_USER_ROLE),
 		router.WithSwagger(
 			router.WithSummary("Create or update an object"),
-			router.WithDescription("Creates a new object or updates an existing one. The object must reference slabs that are already pinned. Objects are automatically signed to verify integrity."),
+			router.WithDescription("Creates or updates an object referencing already-pinned slabs."),
 			router.WithTags(tagObjects),
 			router.WithRequestBody(slabs.PinObjectRequest{}, "Object pinning request including encrypted data key, slabs, and signatures", true),
 			router.WithSuccessResponse(http.StatusNoContent, "Object created or updated successfully"),
@@ -447,7 +446,7 @@ func buildDeleteObjectRoute(a *API) router.RouteDefinition {
 		router.WithAccess(core.ACCESS_USER_ROLE),
 		router.WithSwagger(
 			router.WithSummary("Delete an object"),
-			router.WithDescription("Deletes an object from the indexer. The underlying slabs are not deleted and may be shared with other objects."),
+			router.WithDescription("Deletes an object. Underlying slabs are not deleted and may be shared with other objects."),
 			router.WithTags(tagObjects),
 			router.WithPathParam("key", "Object key identifier (256-bit hash)", ""),
 			router.WithSuccessResponse(http.StatusNoContent, "Object deleted successfully"),
@@ -463,7 +462,6 @@ func buildProxyRoutes(a *API) []router.RouteDefinition {
 
 	for _, def := range proxyRouteDefinitions {
 		opts := []router.RouteOption{
-			router.WithAccess(core.ACCESS_USER_ROLE),
 			router.WithSwagger(
 				append([]router.SwaggerOption{
 					router.WithSummary(def.summary),
@@ -485,10 +483,10 @@ func buildConnectRoutes(a *API) []router.RouteDefinition {
 			router.WithAccess(core.ACCESS_USER_ROLE),
 			router.WithMiddlewares(middleware.AuthMiddleware(a.Context(), middleware.WithAuthPurpose(jwt.PurposeLogin, jwt.PurposeAPI))),
 			router.WithSwagger(
-				router.WithSummary("Approve or reject an application connection request"),
-				router.WithDescription("Approves or rejects an application connection request. Requires valid Portal JWT authentication. The connect key is injected server-side based on the authenticated user's account."),
+				router.WithSummary("Approve or reject a connection request"),
+				router.WithDescription("Approves or rejects an application connection request."),
 				router.WithTags(tagAuth),
-				router.WithPathParam("requestID", "Connect request ID", ""),
+				router.WithPathParam("requestID", "Request ID", ""),
 				router.WithRequestBody(indexdApp.ApproveAppRequest{}, "Approval request body", true),
 				router.WithSuccessResponse(http.StatusNoContent, "Request processed successfully"),
 				router.WithErrorResponses(
@@ -510,9 +508,9 @@ func buildConnectRegisterRoutes(a *API) []router.RouteDefinition {
 			router.WithAccess(core.ACCESS_USER_ROLE),
 			router.WithSwagger(
 				router.WithSummary("Finalize application registration"),
-				router.WithDescription("Registers the application key after approval. The request must be signed with the ephemeral key from the initial connect request. Creates a SiaAppAccount record linking the app to the approving user."),
+				router.WithDescription("Registers the application key after approval."),
 				router.WithTags(tagAuth),
-				router.WithPathParam("requestID", "Connect request ID", ""),
+				router.WithPathParam("requestID", "Request ID", ""),
 				router.WithRequestBody(indexdApp.RegisterAppKeyRequest{}, "Application key registration request", true),
 				router.WithSuccessResponse(http.StatusOK, "Application registered successfully"),
 				router.WithErrorResponses(

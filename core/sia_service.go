@@ -5,6 +5,7 @@ import (
 
 	"go.lumeweb.com/portal-plugin-sia/internal/db"
 	core "go.lumeweb.com/portal/core"
+	"go.sia.tech/core/types"
 )
 
 type SiaService interface {
@@ -14,8 +15,8 @@ type SiaService interface {
 	GetAccount(ctx context.Context, userID uint) (*db.SiaAccount, error)
 	AccountExists(ctx context.Context, userID uint) (bool, error)
 	DeleteAccount(ctx context.Context, userID uint) error
-	RegisterAppAccount(ctx context.Context, siaAccountID uint, accountKey string) (*db.SiaAppAccount, error)
-	GetAppAccountByKey(ctx context.Context, accountKey string) (*db.SiaAppAccount, error)
+	RegisterAppAccount(ctx context.Context, siaAccountID uint, accountKey types.PublicKey) (*db.SiaAppAccount, error)
+	GetAppAccountByKey(ctx context.Context, accountKey types.PublicKey) (*db.SiaAppAccount, error)
 	ListAppAccounts(ctx context.Context, siaAccountID uint) ([]db.SiaAppAccount, error)
 	DeleteAppAccountsBySiaAccountID(ctx context.Context, siaAccountID uint) error
 	AdminClient() AdminClient

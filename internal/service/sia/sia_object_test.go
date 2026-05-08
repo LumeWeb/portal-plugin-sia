@@ -11,8 +11,13 @@ import (
 	coreTesting "go.lumeweb.com/portal/core/testing"
 	coreMocks "go.lumeweb.com/portal/core/testing/mocks"
 	"go.lumeweb.com/portal/db/models"
+	"go.sia.tech/core/types"
 	"gorm.io/gorm"
 )
+
+func generateTestPublicKey() types.PublicKey {
+	return types.GeneratePrivateKey().PublicKey()
+}
 
 func TestRegisterObject_Success(t *testing.T) {
 	coreTesting.RunTestCaseWithDB(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
@@ -21,7 +26,7 @@ func TestRegisterObject_Success(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, "test-key")
+		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		slab1 := generateSlabID()
@@ -43,7 +48,7 @@ func TestRegisterObject_Idempotent(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, "test-key")
+		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		slab1 := generateSlabID()
@@ -65,7 +70,7 @@ func TestRegisterObject_SkipsUnknownSlabs(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, "test-key")
+		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		slab1 := generateSlabID()
@@ -84,7 +89,7 @@ func TestDeleteObject_Success(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, "test-key")
+		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		slab1 := generateSlabID()
@@ -110,7 +115,7 @@ func TestDeleteObject_NotFound(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, "test-key")
+		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		err = siaSvc.DeleteObject(ctx, appAccount.ID, "nonexistent")
@@ -125,7 +130,7 @@ func TestDeleteObject_OnlyDeletesTarget(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, "test-key")
+		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		slab1 := generateSlabID()
@@ -157,7 +162,7 @@ func TestDeleteObjectsByAppAccount_Success(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, "test-key")
+		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		slab1 := generateSlabID()
@@ -188,9 +193,9 @@ func TestDeleteObjectsByAppAccount_DoesNotAffectOtherAccounts(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount1, err := siaSvc.RegisterAppAccount(ctx, account.ID, "key1")
+		appAccount1, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
-		appAccount2, err := siaSvc.RegisterAppAccount(ctx, account.ID, "key2")
+		appAccount2, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		slab1 := generateSlabID()
@@ -221,7 +226,7 @@ func TestFindOrphanedSlabs_None(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, "test-key")
+		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		slab1 := generateSlabID()
@@ -243,7 +248,7 @@ func TestFindOrphanedSlabs_AfterObjectDeleted(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, "test-key")
+		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		slab1 := generateSlabID()
@@ -268,7 +273,7 @@ func TestFindOrphanedSlabs_SharedSlabNotOrphanedIfOtherObjectRefs(t *testing.T) 
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, "test-key")
+		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		slab1 := generateSlabID()
@@ -296,7 +301,7 @@ func TestPruneSlabs_FullyOrphaned_DeletesPinAndUpload(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, "test-key")
+		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		slab1 := generateSlabID()
@@ -331,7 +336,7 @@ func TestPruneSlabs_StillPinnedGlobally_SkipsDeletion(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, "test-key")
+		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		slab1 := generateSlabID()
@@ -359,9 +364,9 @@ func TestPruneSlabs_SharedAcrossAppAccounts_SkipsDeletion(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount1, err := siaSvc.RegisterAppAccount(ctx, account.ID, "key1")
+		appAccount1, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
-		appAccount2, err := siaSvc.RegisterAppAccount(ctx, account.ID, "key2")
+		appAccount2, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		slab1 := generateSlabID()
@@ -392,7 +397,7 @@ func TestPruneSlabs_NoOrphans_NoError(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, "test-key")
+		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		slab1 := generateSlabID()

@@ -34,8 +34,7 @@ type pinResult struct {
 // alreadyPinned checks if the given hash is already pinned for the user,
 // returning true if so. Used to skip duplicate recording on re-pin.
 func (a *API) alreadyPinned(ctx context.Context, hash core.StorageHash, userID uint) bool {
-	pinSvc := core.GetService[core.PinService](a.Context(), core.PIN_SERVICE)
-	pinned, err := pinSvc.UploadPinnedByUser(ctx, hash, userID)
+	pinned, err := a.pinSvc.UploadPinnedByUser(ctx, hash, userID)
 	if err != nil {
 		a.Logger().Error("failed to check pin existence", zap.Error(err))
 		return false
@@ -106,14 +105,13 @@ func (a *API) pinAndRecord(c echo.Context, dataSize uint64, mimeType string, kno
 		UploaderIP: c.RealIP(),
 	}
 
-	uploadSvc := core.GetService[core.UploadService](a.Context(), core.UPLOAD_SERVICE)
-	if err := uploadSvc.SaveUpload(ctx, upload); err != nil {
+	if err := a.uploadSvc.SaveUpload(ctx, upload); err != nil {
 		a.Logger().Error("failed to save upload", zap.Error(err))
 		quota.ReleaseReservations(result)
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to record upload")
 	}
 
-	pinSvc := core.GetService[core.PinService](a.Context(), core.PIN_SERVICE)
+	pinSvc := a.pinSvc
 	pin := &models.Pin{
 		UserID:   userID,
 		UploadID: upload.ID,
@@ -390,24 +388,22 @@ func (a *API) deletePinAndUpload(ctx context.Context, hashStr string, userID uin
 		return fmt.Errorf("invalid hash: %w", err)
 	}
 
-	pinSvc := core.GetService[core.PinService](a.Context(), core.PIN_SERVICE)
-	pin, err := pinSvc.GetPinByHash(ctx, storageHash, userID)
+	pin, err := a.pinSvc.GetPinByHash(ctx, storageHash, userID)
 	if err != nil || pin == nil {
 		return nil
 	}
 
-	uploadSvc := core.GetService[core.UploadService](a.Context(), core.UPLOAD_SERVICE)
-	upload, err := uploadSvc.GetUploadByID(ctx, pin.UploadID)
+	upload, err := a.uploadSvc.GetUploadByID(ctx, pin.UploadID)
 	if err != nil || upload == nil {
 		return nil
 	}
 
-	if err := pinSvc.DeletePin(ctx, pin.ID); err != nil {
+	if err := a.pinSvc.DeletePin(ctx, pin.ID); err != nil {
 		a.Logger().Error("failed to delete pin", zap.Error(err))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to clean up records")
 	}
 
-	if err := uploadSvc.DeleteUpload(ctx, internal.StorageHashFromMultihash(upload.Hash)); err != nil {
+	if err := a.uploadSvc.DeleteUpload(ctx, internal.StorageHashFromMultihash(upload.Hash)); err != nil {
 		a.Logger().Error("failed to delete upload", zap.Error(err))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to clean up records")
 	}

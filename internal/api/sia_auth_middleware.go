@@ -11,7 +11,6 @@ import (
 	"github.com/labstack/echo/v4"
 	mcontext "go.lumeweb.com/portal-middleware/context"
 	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
-	core "go.lumeweb.com/portal/core"
 	"go.sia.tech/core/types"
 )
 
@@ -28,8 +27,7 @@ const (
 // parameters against the provided hostname, looks up the associated Sia
 // account, and sets the Portal userID in the Echo context so downstream
 // handlers can use mcontext.GetUserID unchanged.
-func SiaSignedURLMiddleware(ctx core.Context, hostname string) echo.MiddlewareFunc {
-	siaService := core.GetService[pluginCore.SiaService](ctx, pluginCore.SIA_SERVICE)
+func SiaSignedURLMiddleware(siaService pluginCore.SiaService, hostname string) echo.MiddlewareFunc {
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -74,8 +72,7 @@ func SiaSignedURLMiddleware(ctx core.Context, hostname string) echo.MiddlewareFu
 				return echo.NewHTTPError(http.StatusUnauthorized, "invalid signature")
 			}
 
-			accountKeyStr := base64.URLEncoding.EncodeToString(pk[:])
-			appAccount, err := siaService.GetAppAccountByKey(req.Context(), accountKeyStr)
+			appAccount, err := siaService.GetAppAccountByKey(req.Context(), pk)
 			if err != nil {
 				return echo.NewHTTPError(http.StatusUnauthorized, "unknown account")
 			}

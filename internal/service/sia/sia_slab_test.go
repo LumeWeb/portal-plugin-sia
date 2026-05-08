@@ -17,7 +17,7 @@ func TestRegisterSlab_Success(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, "test-key")
+		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		err = siaSvc.RegisterSlab(ctx, appAccount.ID, "abc123def456")
@@ -38,7 +38,7 @@ func TestRegisterSlab_Idempotent(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, "test-key")
+		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		err = siaSvc.RegisterSlab(ctx, appAccount.ID, "abc123def456")
@@ -60,7 +60,7 @@ func TestRegisterSlab_DifferentSlabs(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, "test-key")
+		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		err = siaSvc.RegisterSlab(ctx, appAccount.ID, "slab1")
@@ -82,7 +82,7 @@ func TestDeleteSlab_Success(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, "test-key")
+		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		err = siaSvc.RegisterSlab(ctx, appAccount.ID, "abc123def456")
@@ -104,7 +104,7 @@ func TestDeleteSlab_NotFound(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, "test-key")
+		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		err = siaSvc.DeleteSlab(ctx, appAccount.ID, "nonexistent")
@@ -119,7 +119,7 @@ func TestDeleteSlab_OnlyDeletesTarget(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, "test-key")
+		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		err = siaSvc.RegisterSlab(ctx, appAccount.ID, "slab1")
@@ -144,7 +144,7 @@ func TestListSlabsByAppAccount_Empty(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, "test-key")
+		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		slabs, err := siaSvc.ListSlabsByAppAccount(ctx, appAccount.ID)
@@ -160,9 +160,9 @@ func TestListSlabsByAppAccount_IsolatedByAccount(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount1, err := siaSvc.RegisterAppAccount(ctx, account.ID, "key1")
+		appAccount1, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
-		appAccount2, err := siaSvc.RegisterAppAccount(ctx, account.ID, "key2")
+		appAccount2, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		err = siaSvc.RegisterSlab(ctx, appAccount1.ID, "shared-slab")
@@ -187,7 +187,7 @@ func TestDeleteSlabsByAppAccount_Success(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, "test-key")
+		appAccount, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		err = siaSvc.RegisterSlab(ctx, appAccount.ID, "slab1")
@@ -211,9 +211,9 @@ func TestDeleteSlabsByAppAccount_DoesNotAffectOtherAccounts(t *testing.T) {
 		account, err := siaSvc.RegisterAccount(ctx, 1)
 		require.NoError(tb, err)
 
-		appAccount1, err := siaSvc.RegisterAppAccount(ctx, account.ID, "key1")
+		appAccount1, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
-		appAccount2, err := siaSvc.RegisterAppAccount(ctx, account.ID, "key2")
+		appAccount2, err := siaSvc.RegisterAppAccount(ctx, account.ID, generateTestPublicKey())
 		require.NoError(tb, err)
 
 		err = siaSvc.RegisterSlab(ctx, appAccount1.ID, "slab1")
