@@ -285,6 +285,6 @@ func (a *API) HandleGETAuthConnect(c echo.Context) error {
 }
 
 func (a *API) resolveSubscriptionURL() string {
-	accountURL := a.appendPort(a.httpSvc.APISubdomain("account", true))
-	return accountURL + "/account/subscription"
+	dashboardURL := a.appendPort(a.httpSvc.APISubdomain("dashboard", true))
+	return dashboardURL + "/account/subscription"
 }

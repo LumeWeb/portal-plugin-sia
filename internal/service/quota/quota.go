@@ -246,6 +246,7 @@ func (s *QuotaService) ConnectQuotaCheck(ctx context.Context, userID uint) (*plu
 	// If FundTargetBytes is 0, the user has no storage quota plan
 	if account.FundTargetBytes == 0 {
 		result.HasQuota = false
+		result.HasUsableHosts = true // not checked, but quota error should take priority
 		return result, nil
 	}
 

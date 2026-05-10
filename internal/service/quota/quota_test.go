@@ -221,7 +221,7 @@ func TestConnectQuotaCheck_FundTargetBytesZero(t *testing.T) {
 
 		require.NoError(tb, err)
 		assert.False(tb, result.HasQuota)
-		assert.False(tb, result.HasUsableHosts)
+		assert.True(tb, result.HasUsableHosts) // quota error takes priority over unchecked hosts
 	}, QuotaTestOptions())
 }
 
