@@ -1,0 +1,24 @@
+{{define "page-title"}}Storage Quota Exceeded{{end}}
+
+{{define "page-content"}}
+<div class="app-header">
+  <div class="error-icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-destructive)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+      <line x1="12" y1="9" x2="12" y2="13"></line>
+      <line x1="12" y1="17" x2="12.01" y2="17"></line>
+    </svg>
+  </div>
+  <h1 class="app-name">Storage Quota Exceeded</h1>
+  <p class="app-description">Your account does not have enough storage quota to connect. Please upgrade your subscription to continue.</p>
+</div>
+
+<div class="divider"></div>
+
+<p class="info-text">Connecting to an application requires available storage quota for uploading and downloading data on your behalf.</p>
+
+<div class="actions">
+  <a class="btn btn-primary" href="{{.SubscriptionURL}}">Manage Subscription</a>
+  <a class="btn btn-ghost" href="javascript:history.back()">Go Back</a>
+</div>
+{{end}}

@@ -1,0 +1,22 @@
+{{define "page-title"}}Service Temporarily Unavailable{{end}}
+
+{{define "page-content"}}
+<div class="app-header">
+  <div class="error-icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-destructive)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"></circle>
+      <line x1="12" y1="8" x2="12" y2="12"></line>
+      <line x1="12" y1="16" x2="12.01" y2="16"></line>
+    </svg>
+  </div>
+  <h1 class="app-name">Service Temporarily Unavailable</h1>
+  <p class="app-description">We're unable to connect to storage providers at the moment. Please try again later or contact support if the problem persists.</p>
+</div>
+
+<div class="divider"></div>
+
+<div class="actions">
+  <a class="btn btn-primary" href="javascript:location.reload()">Try Again</a>
+  <a class="btn btn-ghost" href="javascript:history.back()">Go Back</a>
+</div>
+{{end}}

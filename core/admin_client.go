@@ -5,6 +5,8 @@ import (
 
 	"go.sia.tech/core/rhp/v4"
 	"go.sia.tech/indexd/accounts"
+	"go.sia.tech/indexd/api/admin"
+	"go.sia.tech/indexd/hosts"
 )
 
 type AdminClient interface {
@@ -15,4 +17,5 @@ type AdminClient interface {
 	DeleteAppConnectKey(ctx context.Context, key string) error
 	DeleteAccount(ctx context.Context, acc rhp.Account) error
 	FundingEvents(ctx context.Context, cursor accounts.FundingCursor, limit int) ([]accounts.FundingEvent, error)
+	Hosts(ctx context.Context, opts ...admin.HostQueryParameterOption) ([]hosts.Host, error)
 }
