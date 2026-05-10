@@ -10,6 +10,8 @@ import (
 	mock "github.com/stretchr/testify/mock"
 	"go.sia.tech/core/rhp/v4"
 	"go.sia.tech/indexd/accounts"
+	"go.sia.tech/indexd/api/admin"
+	"go.sia.tech/indexd/hosts"
 )
 
 // NewMockAdminClient creates a new instance of MockAdminClient. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
@@ -346,6 +348,80 @@ func (_c *MockAdminClient_FundingEvents_Call) Return(fundingEvents []accounts.Fu
 }
 
 func (_c *MockAdminClient_FundingEvents_Call) RunAndReturn(run func(ctx context.Context, cursor accounts.FundingCursor, limit int) ([]accounts.FundingEvent, error)) *MockAdminClient_FundingEvents_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Hosts provides a mock function for the type MockAdminClient
+func (_mock *MockAdminClient) Hosts(ctx context.Context, opts ...admin.HostQueryParameterOption) ([]hosts.Host, error) {
+	var tmpOpts []interface{}
+	for _, opt := range opts {
+		tmpOpts = append(tmpOpts, opt)
+	}
+	ret := _mock.Called(append([]interface{}{ctx}, tmpOpts...)...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Hosts")
+	}
+
+	var r0 []hosts.Host
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, ...admin.HostQueryParameterOption) ([]hosts.Host, error)); ok {
+		return returnFunc(ctx, opts...)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, ...admin.HostQueryParameterOption) []hosts.Host); ok {
+		r0 = returnFunc(ctx, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]hosts.Host)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, ...admin.HostQueryParameterOption) error); ok {
+		r1 = returnFunc(ctx, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockAdminClient_Hosts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Hosts'
+type MockAdminClient_Hosts_Call struct {
+	*mock.Call
+}
+
+// Hosts is a helper method to define mock.On call
+//   - ctx context.Context
+//   - opts ...admin.HostQueryParameterOption
+func (_e *MockAdminClient_Expecter) Hosts(ctx interface{}, opts ...interface{}) *MockAdminClient_Hosts_Call {
+	return &MockAdminClient_Hosts_Call{Call: _e.mock.On("Hosts", append([]interface{}{ctx}, opts...)...)}
+}
+
+func (_c *MockAdminClient_Hosts_Call) Run(run func(ctx context.Context, opts ...admin.HostQueryParameterOption)) *MockAdminClient_Hosts_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		vararg1 := make([]admin.HostQueryParameterOption, len(args)-1)
+		for i, a := range args[1:] {
+			if a != nil {
+				vararg1[i] = a.(admin.HostQueryParameterOption)
+			}
+		}
+		run(
+			arg0,
+			vararg1...,
+		)
+	})
+	return _c
+}
+
+func (_c *MockAdminClient_Hosts_Call) Return(hosts []hosts.Host, err error) *MockAdminClient_Hosts_Call {
+	_c.Call.Return(hosts, err)
+	return _c
+}
+
+func (_c *MockAdminClient_Hosts_Call) RunAndReturn(run func(ctx context.Context, opts ...admin.HostQueryParameterOption) ([]hosts.Host, error)) *MockAdminClient_Hosts_Call {
 	_c.Call.Return(run)
 	return _c
 }

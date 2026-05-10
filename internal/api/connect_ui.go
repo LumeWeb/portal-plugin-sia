@@ -25,10 +25,51 @@ type connectPageData struct {
 	RequestID      string
 }
 
+type quotaErrorPageData struct {
+	SubscriptionURL string
+}
+
+type layoutData struct {
+	AriaLabelledBy  string
+	AriaDescribedBy string
+	MetaDescription string
+	PageData        any
+}
+
+//go:embed connect_layout.html
+var connectLayoutHTML string
+
 //go:embed connect.html
 var connectHTML string
 
-var connectTemplate = template.Must(template.New("connect").Parse(connectHTML))
+//go:embed connect_quota_error.html
+var connectQuotaErrorHTML string
+
+//go:embed connect_system_error.html
+var connectSystemErrorHTML string
+
+var (
+	connectTemplate     *template.Template
+	quotaErrorTemplate  *template.Template
+	systemErrorTemplate *template.Template
+)
+
+func init() {
+	connectTemplate = template.Must(template.New("connect").
+		Parse(connectLayoutHTML))
+	template.Must(connectTemplate.New("page").Parse(connectHTML))
+	template.Must(connectTemplate.Parse(`{{define "connect"}}{{template "layout" .}}{{end}}`))
+
+	quotaErrorTemplate = template.Must(template.New("quota-error").
+		Parse(connectLayoutHTML))
+	template.Must(quotaErrorTemplate.New("page").Parse(connectQuotaErrorHTML))
+	template.Must(quotaErrorTemplate.Parse(`{{define "quota-error"}}{{template "layout" .}}{{end}}`))
+
+	systemErrorTemplate = template.Must(template.New("system-error").
+		Parse(connectLayoutHTML))
+	template.Must(systemErrorTemplate.New("page").Parse(connectSystemErrorHTML))
+	template.Must(systemErrorTemplate.Parse(`{{define "system-error"}}{{template "layout" .}}{{end}}`))
+}
 
 func parseAuthConnectHTML(htmlBody string) (connectPageData, error) {
 	var data connectPageData
@@ -201,7 +242,7 @@ func (a *API) HandleGETAuthConnect(c echo.Context) error {
 	}
 	data.RequestID = requestID
 
-	_, err = mcontext.GetUserID(c)
+	userID, err := mcontext.GetUserID(c)
 	if err != nil {
 		dashboardURL := a.appendPort(a.httpSvc.APISubdomain("dashboard", true))
 
@@ -215,6 +256,35 @@ func (a *API) HandleGETAuthConnect(c echo.Context) error {
 		return c.Redirect(http.StatusFound, dest.String())
 	}
 
+  	quotaResult, err := a.quotaSvc.ConnectQuotaCheck(ctx, userID)
+	if err != nil {
+		a.Logger().Error("failed to check connect quota", zap.Uint("userID", userID), zap.Error(err))
+	} else if quotaResult != nil {
+		if !quotaResult.HasUsableHosts {
+			c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
+			return systemErrorTemplate.ExecuteTemplate(c.Response().Writer, "system-error", layoutData{})
+		}
+		if !quotaResult.HasQuota {
+			subscriptionURL := a.resolveSubscriptionURL()
+			c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
+			return quotaErrorTemplate.ExecuteTemplate(c.Response().Writer, "quota-error", layoutData{
+				PageData: quotaErrorPageData{
+					SubscriptionURL: subscriptionURL,
+				},
+			})
+		}
+	}
+
 	c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
-	return connectTemplate.Execute(c.Response().Writer, data)
+	return connectTemplate.ExecuteTemplate(c.Response().Writer, "connect", layoutData{
+		AriaLabelledBy:  "connect-heading",
+		AriaDescribedBy: "connect-description",
+		MetaDescription: "Approve or reject application connection request",
+		PageData:        data,
+	})
+}
+
+func (a *API) resolveSubscriptionURL() string {
+	accountURL := a.appendPort(a.httpSvc.APISubdomain("account", true))
+	return accountURL + "/account/subscription"
 }

@@ -15,6 +15,7 @@ import (
 	db "go.lumeweb.com/portal/db"
 	"go.sia.tech/core/types"
 	"go.sia.tech/indexd/accounts"
+	"go.sia.tech/indexd/api/admin"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -228,6 +229,75 @@ func (s *QuotaService) EnforceFundingTarget(ctx context.Context, userID uint) er
 
 func (s *QuotaService) Stop() error {
 	return nil
+}
+
+func (s *QuotaService) ConnectQuotaCheck(ctx context.Context, userID uint) (*pluginCore.ConnectQuotaResult, error) {
+	result := &pluginCore.ConnectQuotaResult{
+		HasQuota:       true,  // assume good until proven otherwise
+		HasUsableHosts: false, // assume bad until proven otherwise
+	}
+
+	// 1. Get the user's Sia account from DB
+	account, err := s.siaService.GetAccount(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sia account: %w", err)
+	}
+
+	// If FundTargetBytes is 0, the user has no storage quota plan
+	if account.FundTargetBytes == 0 {
+		result.HasQuota = false
+		return result, nil
+	}
+
+	// 2. Get usable hosts from indexd admin API
+	adminClient := s.siaService.AdminClient()
+	if adminClient == nil {
+		// Admin client not configured - can't check hosts, assume OK
+		result.HasUsableHosts = true
+		return result, nil
+	}
+
+	usableHosts, err := adminClient.Hosts(ctx, admin.WithUsable(true))
+	if err != nil {
+		s.Logger().Warn("failed to get usable hosts for quota check", zap.Uint("userID", userID), zap.Error(err))
+		// Can't determine host status - assume OK to avoid blocking Connect UI on transient errors
+		result.HasUsableHosts = true
+		return result, nil
+	}
+
+	numHosts := uint64(len(usableHosts))
+	if numHosts == 0 {
+		result.HasUsableHosts = false
+		result.HasQuota = false
+		return result, nil
+	}
+	result.HasUsableHosts = true
+
+	// 3. Calculate predicted bytes: FundTargetBytes is the per-host per-interval budget.
+	//    Total across N hosts: FundTargetBytes * N
+	//    The 50/50 split: upload = total/2, download = total/2
+	totalBytes := account.FundTargetBytes * numHosts
+	uploadBytes := totalBytes / 2
+	downloadBytes := totalBytes / 2
+
+	// 4. Check quota reserves against predicted usage
+	//    Check upload quota with predicted upload bytes
+	uploadResult, err := quotaPkg.CheckUploadQuota(ctx, s.Context(), userID, uploadBytes)
+	if err != nil {
+		s.Logger().Warn("failed to check upload quota", zap.Uint("userID", userID), zap.Error(err))
+	} else if uploadResult != nil && !uploadResult.Allowed {
+		result.HasQuota = false
+	}
+
+	// Check download quota with predicted download bytes
+	downloadResult, err := quotaPkg.CheckDownloadQuota(ctx, s.Context(), userID, downloadBytes)
+	if err != nil {
+		s.Logger().Warn("failed to check download quota", zap.Uint("userID", userID), zap.Error(err))
+	} else if downloadResult != nil && !downloadResult.Allowed {
+		result.HasQuota = false
+	}
+
+	return result, nil
 }
 
 func (s *QuotaService) SyncFunding(ctx context.Context) error {

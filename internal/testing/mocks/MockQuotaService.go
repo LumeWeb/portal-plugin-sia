@@ -8,6 +8,7 @@ import (
 	"context"
 
 	mock "github.com/stretchr/testify/mock"
+	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
 	"go.lumeweb.com/portal/config"
 	"go.lumeweb.com/portal/core"
 	"gorm.io/gorm"
@@ -231,6 +232,74 @@ func (_c *MockQuotaService_EnforceFundingTarget_Call) Return(err error) *MockQuo
 }
 
 func (_c *MockQuotaService_EnforceFundingTarget_Call) RunAndReturn(run func(ctx context.Context, userID uint) error) *MockQuotaService_EnforceFundingTarget_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ConnectQuotaCheck provides a mock function for the type MockQuotaService
+func (_mock *MockQuotaService) ConnectQuotaCheck(ctx context.Context, userID uint) (*pluginCore.ConnectQuotaResult, error) {
+	ret := _mock.Called(ctx, userID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ConnectQuotaCheck")
+	}
+
+	var r0 *pluginCore.ConnectQuotaResult
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uint) (*pluginCore.ConnectQuotaResult, error)); ok {
+		return returnFunc(ctx, userID)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, uint) *pluginCore.ConnectQuotaResult); ok {
+		r0 = returnFunc(ctx, userID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*pluginCore.ConnectQuotaResult)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, uint) error); ok {
+		r1 = returnFunc(ctx, userID)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockQuotaService_ConnectQuotaCheck_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ConnectQuotaCheck'
+type MockQuotaService_ConnectQuotaCheck_Call struct {
+	*mock.Call
+}
+
+// ConnectQuotaCheck is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID uint
+func (_e *MockQuotaService_Expecter) ConnectQuotaCheck(ctx interface{}, userID interface{}) *MockQuotaService_ConnectQuotaCheck_Call {
+	return &MockQuotaService_ConnectQuotaCheck_Call{Call: _e.mock.On("ConnectQuotaCheck", ctx, userID)}
+}
+
+func (_c *MockQuotaService_ConnectQuotaCheck_Call) Run(run func(ctx context.Context, userID uint)) *MockQuotaService_ConnectQuotaCheck_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 uint
+		if args[1] != nil {
+			arg1 = args[1].(uint)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockQuotaService_ConnectQuotaCheck_Call) Return(connectQuotaResult *pluginCore.ConnectQuotaResult, err error) *MockQuotaService_ConnectQuotaCheck_Call {
+	_c.Call.Return(connectQuotaResult, err)
+	return _c
+}
+
+func (_c *MockQuotaService_ConnectQuotaCheck_Call) RunAndReturn(run func(ctx context.Context, userID uint) (*pluginCore.ConnectQuotaResult, error)) *MockQuotaService_ConnectQuotaCheck_Call {
 	_c.Call.Return(run)
 	return _c
 }

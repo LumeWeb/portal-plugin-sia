@@ -101,8 +101,11 @@ func (m *mockHelper) SetupSiaServiceMocks(userID uint) *siaMocks.MockSiaService 
 func (m *mockHelper) SetupQuotaServiceMocks(userID uint) *siaMocks.MockQuotaService {
 	mockQuotaService := core.GetService[*siaMocks.MockQuotaService](m.ctx, pluginCore.QUOTA_SERVICE)
 
-	// Setup EnforceFundingTarget expectation
 	mockQuotaService.EXPECT().EnforceFundingTarget(mock.Anything, userID).Return(nil).Maybe()
+	mockQuotaService.EXPECT().ConnectQuotaCheck(mock.Anything, userID).Return(&pluginCore.ConnectQuotaResult{
+		HasQuota:       true,
+		HasUsableHosts: true,
+	}, nil).Maybe()
 
 	return mockQuotaService
 }
