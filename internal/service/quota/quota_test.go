@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -17,6 +18,7 @@ import (
 	"go.lumeweb.com/portal-plugin-sia/internal/service/sia"
 	"go.lumeweb.com/portal-plugin-sia/internal/testing/mocks"
 	"go.lumeweb.com/portal-plugin-sia/internal/testing/util"
+	"go.sia.tech/core/types"
 	"go.sia.tech/indexd/accounts"
 	"go.sia.tech/indexd/hosts"
 	"go.lumeweb.com/portal/core"
@@ -156,6 +158,63 @@ func TestSyncFunding_NoAdminClient(t *testing.T) {
 		assert.NoError(tb, err)
 	}, QuotaTestOptions())
 }
+
+func TestSyncFunding_PoolEventAttributed(t *testing.T) {
+	opts, mockAdmin := quotaTestOptionsWithMockAdmin(t)
+
+	quotaKey := "user-42"
+	poolID := 42
+	poolEvent := accounts.FundingEvent{
+		ID:                     100,
+		HostKey:                types.PublicKey{0x01},
+		AmountSC:               types.NewCurrency64(1000),
+		EstimatedUploadBytes:   5000,
+		EstimatedDownloadBytes: 3000,
+		FundType:               accounts.FundingTypePool,
+		PoolID:                 &poolID,
+		QuotaName:              &quotaKey,
+		CreatedAt:              time.Now(),
+	}
+
+	mockAdmin.EXPECT().FundingEvents(mock.Anything, mock.Anything, mock.Anything).Return([]accounts.FundingEvent{poolEvent}, nil).Once()
+	mockAdmin.EXPECT().FundingEvents(mock.Anything, mock.Anything, mock.Anything).Return([]accounts.FundingEvent{}, nil).Maybe()
+
+	coreTesting.RunTestCaseWithDB(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
+		// Ensure a funding cursor row exists
+		cursor := &siaDB.FundingCursor{
+			ID:                 1,
+			LastFundingEventID: 0,
+			LastFundingEventAt: time.Time{},
+		}
+		ctx.DB().Where("id = ?", 1).FirstOrCreate(cursor)
+
+		// Create a SiaAccount with matching QuotaKey
+		account := &siaDB.SiaAccount{
+			UserID:   42,
+			QuotaKey: quotaKey,
+		}
+		ctx.DB().Create(account)
+
+		quotaSvc := core.GetService[pluginCore.QuotaService](ctx, pluginCore.QUOTA_SERVICE)
+		err := quotaSvc.SyncFunding(context.Background())
+
+		assert.NoError(tb, err)
+
+		// Verify the global cursor advanced past the pool event
+		var updatedCursor siaDB.FundingCursor
+		err = ctx.DB().Where("id = ?", 1).First(&updatedCursor).Error
+		require.NoError(tb, err)
+		assert.Equal(tb, int64(100), updatedCursor.LastFundingEventID, "cursor should advance past pool event")
+
+		// Verify the SiaAccount was updated with the event tracking
+		var updatedAccount siaDB.SiaAccount
+		err = ctx.DB().Where("quota_key = ?", quotaKey).First(&updatedAccount).Error
+		require.NoError(tb, err)
+		assert.Equal(tb, int64(100), updatedAccount.LastFundingEventID, "account should track the pool event ID")
+		require.NotNil(tb, updatedAccount.LastFundingEventAt)
+	}, opts)
+}
+
 
 func TestProvisionAccount_DatabaseIntegration(t *testing.T) {
 	coreTesting.RunTestCaseWithDB(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {

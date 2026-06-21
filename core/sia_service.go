@@ -14,6 +14,7 @@ type SiaService interface {
 	RegisterAccount(ctx context.Context, userID uint) (*db.SiaAccount, error)
 	GetAccount(ctx context.Context, userID uint) (*db.SiaAccount, error)
 	GetAccountByID(ctx context.Context, id uint) (*db.SiaAccount, error)
+	GetAccountByQuotaKey(ctx context.Context, quotaKey string) (*db.SiaAccount, error)
 	AccountExists(ctx context.Context, userID uint) (bool, error)
 	DeleteAccount(ctx context.Context, userID uint) error
 	RegisterAppAccount(ctx context.Context, siaAccountID uint, accountKey types.PublicKey) (*db.SiaAppAccount, error)

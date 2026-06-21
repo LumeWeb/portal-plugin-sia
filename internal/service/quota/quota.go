@@ -339,18 +339,40 @@ func (s *QuotaService) SyncFunding(ctx context.Context) error {
 					break
 				}
 
-				// 3. Process each event — look up account on-demand by AccountKey via SiaAppAccount join
+				// 3. Process each event — look up account on-demand
 				for _, event := range events {
-					appAccount, err := s.siaService.GetAppAccountByKey(ctx, types.PublicKey(event.AccountKey))
-					if err != nil {
-						continue
-					}
-
 					var account siaDB.SiaAccount
-					if err := db.RetryableComponentLock(s, func(tx *gorm.DB) *gorm.DB {
-						return tx.Where("id = ?", appAccount.SiaAccountID).First(&account)
-					}); err != nil {
-						continue
+
+					if event.FundType == accounts.FundingTypePool {
+						// Pool funding events: AccountKey is the pool's public key,
+						// not a user account key. Use QuotaName (resolved by indexd
+						// via pool_id → pools → app_connect_keys → quotas) to find
+						// the user's SiaAccount by QuotaKey.
+						if event.QuotaName == nil || *event.QuotaName == "" {
+							s.Logger().Debug("pool funding event has no quota name, skipping",
+								zap.Int64("eventID", event.ID))
+							continue
+						}
+						acc, err := s.siaService.GetAccountByQuotaKey(ctx, *event.QuotaName)
+						if err != nil {
+							s.Logger().Debug("no sia account found for quota key",
+								zap.String("quotaKey", *event.QuotaName),
+								zap.Int64("eventID", event.ID))
+							continue
+						}
+						account = *acc
+					} else {
+						// Account funding events: look up via AccountKey → SiaAppAccount → SiaAccount
+						appAccount, err := s.siaService.GetAppAccountByKey(ctx, types.PublicKey(event.AccountKey))
+						if err != nil {
+							continue
+						}
+
+						if err := db.RetryableComponentLock(s, func(tx *gorm.DB) *gorm.DB {
+							return tx.Where("id = ?", appAccount.SiaAccountID).First(&account)
+						}); err != nil {
+							continue
+						}
 					}
 
 					// Dedup: skip events we've already processed for this account

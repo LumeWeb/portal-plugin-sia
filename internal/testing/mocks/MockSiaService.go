@@ -959,6 +959,74 @@ func (_c *MockSiaService_GetAccountByID_Call) RunAndReturn(run func(ctx context.
 	return _c
 }
 
+// GetAccountByQuotaKey provides a mock function for the type MockSiaService
+func (_mock *MockSiaService) GetAccountByQuotaKey(ctx context.Context, quotaKey string) (*db.SiaAccount, error) {
+	ret := _mock.Called(ctx, quotaKey)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetAccountByQuotaKey")
+	}
+
+	var r0 *db.SiaAccount
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) (*db.SiaAccount, error)); ok {
+		return returnFunc(ctx, quotaKey)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context, string) *db.SiaAccount); ok {
+		r0 = returnFunc(ctx, quotaKey)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*db.SiaAccount)
+		}
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = returnFunc(ctx, quotaKey)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
+}
+
+// MockSiaService_GetAccountByQuotaKey_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAccountByQuotaKey'
+type MockSiaService_GetAccountByQuotaKey_Call struct {
+	*mock.Call
+}
+
+// GetAccountByQuotaKey is a helper method to define mock.On call
+//   - ctx context.Context
+//   - quotaKey string
+func (_e *MockSiaService_Expecter) GetAccountByQuotaKey(ctx interface{}, quotaKey interface{}) *MockSiaService_GetAccountByQuotaKey_Call {
+	return &MockSiaService_GetAccountByQuotaKey_Call{Call: _e.mock.On("GetAccountByQuotaKey", ctx, quotaKey)}
+}
+
+func (_c *MockSiaService_GetAccountByQuotaKey_Call) Run(run func(ctx context.Context, quotaKey string)) *MockSiaService_GetAccountByQuotaKey_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 string
+		if args[1] != nil {
+			arg1 = args[1].(string)
+		}
+		run(
+			arg0,
+			arg1,
+		)
+	})
+	return _c
+}
+
+func (_c *MockSiaService_GetAccountByQuotaKey_Call) Return(siaAccount *db.SiaAccount, err error) *MockSiaService_GetAccountByQuotaKey_Call {
+	_c.Call.Return(siaAccount, err)
+	return _c
+}
+
+func (_c *MockSiaService_GetAccountByQuotaKey_Call) RunAndReturn(run func(ctx context.Context, quotaKey string) (*db.SiaAccount, error)) *MockSiaService_GetAccountByQuotaKey_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetAppAccountByKey provides a mock function for the type MockSiaService
 func (_mock *MockSiaService) GetAppAccountByKey(ctx context.Context, accountKey types.PublicKey) (*db.SiaAppAccount, error) {
 	ret := _mock.Called(ctx, accountKey)
