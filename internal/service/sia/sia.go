@@ -265,6 +265,20 @@ func (s *SiaService) GetAccountByID(ctx context.Context, id uint) (*siaDB.SiaAcc
 	return &account, nil
 }
 
+func (s *SiaService) GetAccountByQuotaKey(ctx context.Context, quotaKey string) (*siaDB.SiaAccount, error) {
+	ctx, span := core.TraceMethod(ctx, "SiaService.GetAccountByQuotaKey")
+	defer span.End()
+
+	var account siaDB.SiaAccount
+	err := db.RetryableComponentLock(s, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("quota_key = ?", quotaKey).First(&account)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &account, nil
+}
+
 func (s *SiaService) AccountExists(ctx context.Context, userID uint) (bool, error) {
 	ctx, span := core.TraceMethod(ctx, "SiaService.AccountExists")
 	defer span.End()
