@@ -2,6 +2,7 @@ package sia
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"sync"
@@ -20,6 +21,7 @@ import (
 	"go.sia.tech/core/rhp/v4"
 	"go.sia.tech/core/types"
 	"go.sia.tech/indexd/accounts"
+	"go.sia.tech/indexd/api"
 	"go.sia.tech/indexd/api/admin"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -800,20 +802,37 @@ func (s *SiaService) ListApps(ctx context.Context, userID uint, filters []queryu
 		return nil, 0, fmt.Errorf("failed to list app accounts: %w", err)
 	}
 
-	// 4. Enrich with indexd admin client data
+	// 4. Enrich with indexd admin client data via a single bulk fetch
 	adminClient := s.AdminClient()
 	if adminClient == nil {
 		return nil, 0, fmt.Errorf("admin client not configured")
 	}
 
+	// Fetch all accounts under the user's connect key in one round-trip
+	accts, err := adminClient.Accounts(ctx, api.WithConnectKey(account.ConnectKey))
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list indexd accounts: %w", err)
+	}
+
+	// Build a lookup map keyed by public key
+	acctByPub := make(map[types.PublicKey]accounts.Account, len(accts))
+	for _, acct := range accts {
+		acctByPub[types.PublicKey(acct.AccountKey)] = acct
+	}
+
+	// 5. Enrich each local DB row with indexd data
 	result := make([]pluginCore.AppAccount, 0, len(appAccounts))
 	for _, appAcct := range appAccounts {
 		pubKey := appAcct.AccountKey.PublicKey()
-		acct, err := adminClient.Account(ctx, pubKey)
-		if err != nil {
-			s.Logger().Error("failed to fetch account from indexd",
+
+		acct, ok := acctByPub[pubKey]
+		if !ok {
+			// Keep the row visible so total stays consistent with the
+			// returned page and users can still see/delete stale accounts.
+			s.Logger().Warn("indexd account not found for app account",
 				zap.Uint("appAccountID", appAcct.ID),
-				zap.Error(err))
+				zap.String("publicKey", hex.EncodeToString(pubKey[:])))
+			result = append(result, pluginCore.AppAccount{PublicKey: pubKey})
 			continue
 		}
 
