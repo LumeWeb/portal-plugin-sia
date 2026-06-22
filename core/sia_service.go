@@ -21,6 +21,7 @@ type SiaService interface {
 	GetAppAccountByKey(ctx context.Context, accountKey types.PublicKey) (*db.SiaAppAccount, error)
 	ListAppAccounts(ctx context.Context, siaAccountID uint) ([]db.SiaAppAccount, error)
 	DeleteAppAccountsBySiaAccountID(ctx context.Context, siaAccountID uint) error
+	DeleteAppAccount(ctx context.Context, siaAccountID uint, accountKey types.PublicKey) error
 	AdminClient() AdminClient
 	GetFundingCursor(ctx context.Context) (*db.FundingCursor, error)
 	UpdateFundingCursor(ctx context.Context, cursor *db.FundingCursor) error
@@ -37,6 +38,10 @@ type SiaService interface {
 	DeleteObjectsByAppAccount(ctx context.Context, siaAppAccountID uint) error
 	FindOrphanedSlabs(ctx context.Context, siaAppAccountID uint) ([]string, error)
 	PruneSlabs(ctx context.Context, siaAppAccountID uint) error
+
+	// App summary and account-level pruning
+	GetAppsSummary(ctx context.Context, userID uint) (*AppsSummary, error)
+	PruneAccount(ctx context.Context, userID uint) error
 
 	// Auth request methods
 	StoreAuthRequest(ctx context.Context, requestID string, userID uint) error

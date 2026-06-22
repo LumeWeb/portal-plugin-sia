@@ -1,9 +1,6 @@
-template: testify
-template-data:
-  unroll-variadic: true
-filename: "Mock{{.InterfaceName}}.go"
-pkgname: "mocks"
 dir: ./internal/testing/mocks
+filename: "Mock{{.InterfaceName}}.go"
+outpkg: mocks
 packages:
   go.lumeweb.com/portal-plugin-sia/core:
     interfaces:
