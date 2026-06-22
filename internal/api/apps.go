@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
@@ -13,6 +14,7 @@ import (
 	"go.lumeweb.com/portal-plugin-sia/internal"
 	"go.lumeweb.com/portal-plugin-sia/internal/api/dto"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 // listAppsHandler returns a summary of all apps connected to the user's Sia account.
@@ -60,6 +62,9 @@ func (a *API) deleteAppHandler(c echo.Context) error {
 
 	// Delete the app account (verifies ownership, calls admin, removes DB record)
 	if err := a.siaSvc.DeleteAppAccount(c.Request().Context(), account.ID, pubkey); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return echo.NewHTTPError(http.StatusNotFound, "app account not found")
+		}
 		a.Logger().Error("failed to delete app account", zap.Error(err))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to delete app account")
 	}

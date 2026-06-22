@@ -13,6 +13,7 @@ import (
 	siaMocks "go.lumeweb.com/portal-plugin-sia/internal/testing/mocks"
 	"go.lumeweb.com/portal/core"
 	coreTesting "go.lumeweb.com/portal/core/testing"
+	"gorm.io/gorm"
 )
 
 // testPubkeyHex is a valid 32-byte ed25519 public key in hex (64 chars).
@@ -159,11 +160,11 @@ func TestDeleteApp_NotFound(t *testing.T) {
 		mockSiaService := core.GetService[*siaMocks.MockSiaService](ctx, pluginCore.SIA_SERVICE)
 
 		mockSiaService.EXPECT().DeleteAppAccount(mock.Anything, mock.AnythingOfType("uint"), testPubkey).
-			Return(assert.AnError).Once()
+			Return(gorm.ErrRecordNotFound).Once()
 
 		resp := helper.makeAuthenticatedRequest(http.MethodDelete, "/apps/"+testPubkeyHex, token, nil)
 
-		assert.Equal(t, http.StatusInternalServerError, resp.Code)
+		assert.Equal(t, http.StatusNotFound, resp.Code)
 	}, TestOptions)
 }
 
