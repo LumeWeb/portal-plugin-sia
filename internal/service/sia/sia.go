@@ -19,6 +19,7 @@ import (
 	"go.sia.tech/core/rhp/v4"
 	"go.sia.tech/core/types"
 	"go.sia.tech/indexd/accounts"
+	"go.sia.tech/indexd/api"
 	"go.sia.tech/indexd/api/admin"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -189,6 +190,40 @@ func (s *SiaService) DeleteAppAccountsBySiaAccountID(ctx context.Context, siaAcc
 
 	return db.RetryableComponentTransaction(s, ctx, func(tx *gorm.DB) *gorm.DB {
 		return tx.Where("sia_account_id = ?", siaAccountID).Delete(&siaDB.SiaAppAccount{})
+	})
+}
+
+// DeleteAppAccount deletes a single app account by its ed25519 public key,
+// verifying it belongs to the given Sia account. It calls the admin client to
+// remove the account on the indexd side, then removes the local DB record.
+func (s *SiaService) DeleteAppAccount(ctx context.Context, siaAccountID uint, accountKey types.PublicKey) error {
+	ctx, span := core.TraceMethod(ctx, "SiaService.DeleteAppAccount")
+	defer span.End()
+
+	// 1. Find the app account by public key, verifying ownership
+	var appAccount siaDB.SiaAppAccount
+	err := db.RetryableComponentLock(s, func(tx *gorm.DB) *gorm.DB {
+		return tx.Joins("JOIN sia_account_keys ON sia_account_keys.id = sia_app_accounts.account_key_id").
+			Where("sia_account_keys.public_key = ? AND sia_app_accounts.sia_account_id = ?", accountKey[:], siaAccountID).
+			First(&appAccount)
+	})
+	if err != nil {
+		return fmt.Errorf("failed to find app account: %w", err)
+	}
+
+	// 2. Delete the account on the admin side
+	if s.adminClient == nil {
+		return errors.New("admin client not configured")
+	}
+
+	protoAccount := rhp.Account(accountKey)
+	if err := s.adminClient.DeleteAccount(ctx, protoAccount); err != nil {
+		return fmt.Errorf("failed to delete indexd account: %w", err)
+	}
+
+	// 3. Delete the DB record
+	return db.RetryableComponentTransaction(s, ctx, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("id = ? AND sia_account_id = ?", appAccount.ID, siaAccountID).Delete(&siaDB.SiaAppAccount{})
 	})
 }
 
@@ -718,6 +753,89 @@ func (s *SiaService) PruneSlabs(ctx context.Context, siaAppAccountID uint) error
 			s.Logger().Error("failed to delete upload",
 				zap.String("slabID", slabID),
 				zap.Error(err))
+		}
+	}
+
+	return nil
+}
+
+// GetAppsSummary aggregates app account data for a user's Sia account.
+// It calls the admin client to list all accounts under the user's connect key,
+// then builds a summary with per-app details and aggregate usage/quota.
+func (s *SiaService) GetAppsSummary(ctx context.Context, userID uint) (*pluginCore.AppsSummary, error) {
+	ctx, span := core.TraceMethod(ctx, "SiaService.GetAppsSummary")
+	defer span.End()
+
+	// 1. Get the user's Sia account
+	account, err := s.GetAccount(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sia account: %w", err)
+	}
+
+	adminClient := s.AdminClient()
+	if adminClient == nil {
+		return nil, fmt.Errorf("admin client not configured")
+	}
+
+	// 2. Get all accounts under this connect key
+	accts, err := adminClient.Accounts(ctx, api.WithConnectKey(account.ConnectKey))
+	if err != nil {
+		return nil, fmt.Errorf("failed to list accounts: %w", err)
+	}
+
+	// 3. Build the summary
+	summary := &pluginCore.AppsSummary{
+		Apps: make([]pluginCore.AppSummary, 0, len(accts)),
+	}
+
+	for _, acct := range accts {
+		summary.Apps = append(summary.Apps, pluginCore.AppSummary{
+			Name:        acct.App.Name,
+			Description: acct.App.Description,
+			LogoURL:     acct.App.LogoURL,
+			ServiceURL:  acct.App.ServiceURL,
+			PinnedData:  acct.PinnedData,
+			LastUsed:    acct.LastUsed,
+		})
+	}
+
+	summary.AppCount = len(summary.Apps)
+
+	return summary, nil
+}
+
+// PruneAccount prunes all pinned slabs across all app accounts for a user.
+// It calls the admin client's PruneSlabs for each app account key, which
+// removes slabs not currently referenced by any object.
+func (s *SiaService) PruneAccount(ctx context.Context, userID uint) error {
+	ctx, span := core.TraceMethod(ctx, "SiaService.PruneAccount")
+	defer span.End()
+
+	// 1. Get the user's Sia account
+	account, err := s.GetAccount(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("failed to get sia account: %w", err)
+	}
+
+	// 2. List all app accounts
+	appAccounts, err := s.ListAppAccounts(ctx, account.ID)
+	if err != nil {
+		return fmt.Errorf("failed to list app accounts: %w", err)
+	}
+
+	adminClient := s.AdminClient()
+	if adminClient == nil {
+		return fmt.Errorf("admin client not configured")
+	}
+
+	// 3. Prune each app account
+	for _, appAcct := range appAccounts {
+		pubKey := appAcct.AccountKey.PublicKey()
+		if err := adminClient.PruneSlabs(ctx, pubKey); err != nil {
+			s.Logger().Error("failed to prune account slabs",
+				zap.Uint("appAccountID", appAcct.ID),
+				zap.Error(err))
+			continue
 		}
 	}
 

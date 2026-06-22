@@ -374,6 +374,10 @@ func (a *API) Configure(r router.Router, accessSvc core.AccessService) error {
 	}
 	router.RegisterRoutes(r, accessSvc, a.Subdomain(), signedRoutes)
 
+	// App management routes (JWT auth required)
+	appRoutes := buildAppsRoutes(a)
+	router.RegisterRoutes(r, accessSvc, a.Subdomain(), appRoutes)
+
 	return nil
 }
 
