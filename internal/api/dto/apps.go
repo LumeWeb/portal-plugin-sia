@@ -1,18 +1,20 @@
 package dto
 
 import (
+	"encoding/hex"
 	"time"
 
 	"go.lumeweb.com/httputil"
-	"go.lumeweb.com/portal-plugin-sia/core"
+	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
 )
 
 var (
-	_ httputil.DTOResponse[*core.AppsSummary] = (*AppsSummaryResponse)(nil)
+	_ httputil.DTOResponse[*pluginCore.AppAccount] = (*AppResponse)(nil)
 )
 
-// AppSummaryResponse describes a single app account in the summary response.
-type AppSummaryResponse struct {
+// AppResponse describes a single app account in the list response.
+type AppResponse struct {
+	PublicKey   string    `json:"publicKey"`
 	Name        string    `json:"name"`
 	Description string    `json:"description"`
 	LogoURL     string    `json:"logoURL"`
@@ -21,27 +23,30 @@ type AppSummaryResponse struct {
 	LastUsed    time.Time `json:"lastUsed"`
 }
 
-// AppsSummaryResponse is the response for GET /api/apps.
-type AppsSummaryResponse struct {
-	AppCount int                  `json:"appCount"`
-	Apps     []AppSummaryResponse `json:"apps"`
-}
-
-func (r *AppsSummaryResponse) FromModel(model *core.AppsSummary) error {
+// FromModel converts a core.AppAccount to an AppResponse DTO.
+func (r *AppResponse) FromModel(model *pluginCore.AppAccount) error {
 	if model == nil {
 		return nil
 	}
-	r.AppCount = model.AppCount
-	r.Apps = make([]AppSummaryResponse, 0, len(model.Apps))
-	for _, app := range model.Apps {
-		r.Apps = append(r.Apps, AppSummaryResponse{
-			Name:        app.Name,
-			Description: app.Description,
-			LogoURL:     app.LogoURL,
-			ServiceURL:  app.ServiceURL,
-			PinnedData:  app.PinnedData,
-			LastUsed:    app.LastUsed,
-		})
-	}
+	r.PublicKey = hex.EncodeToString(model.PublicKey[:])
+	r.Name = model.Name
+	r.Description = model.Description
+	r.LogoURL = model.LogoURL
+	r.ServiceURL = model.ServiceURL
+	r.PinnedData = model.PinnedData
+	r.LastUsed = model.LastUsed
 	return nil
+}
+
+// AppListResponse is a swagger-only DTO that represents the paginated response
+// for the GET /api/apps endpoint.
+//
+// This struct exists due to a TODO bug where queryutil.Response generics are not getting detected
+// properly as an array type in the swagger documentation generation. By providing a concrete struct,
+// we ensure the swagger docs correctly show the data field as an array of AppResponse items.
+//
+// Note: This struct is only used for swagger documentation, not for actual encoding.
+type AppListResponse struct {
+	Data  []AppResponse `json:"data"`
+	Total int64         `json:"total"`
 }

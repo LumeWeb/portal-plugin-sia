@@ -1,38 +1,53 @@
 package api
 
 import (
+	"encoding/hex"
 	"errors"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"go.lumeweb.com/httputil"
 	jwt "go.lumeweb.com/portal-middleware/auth/jwt"
 	mcontext "go.lumeweb.com/portal-middleware/context"
 	middleware "go.lumeweb.com/portal-middleware/middleware"
 	router "go.lumeweb.com/portal-router"
 	core "go.lumeweb.com/portal/core"
+	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
 	"go.lumeweb.com/portal-plugin-sia/internal"
 	"go.lumeweb.com/portal-plugin-sia/internal/api/dto"
+	"go.lumeweb.com/queryutil"
+	queryutilHttp "go.lumeweb.com/queryutil/http"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
-// listAppsHandler returns a summary of all apps connected to the user's Sia account.
+// listAppsHandler returns a paginated, filtered, sorted list of apps
+// connected to the user's Sia account. The current user's ID is injected
+// as a filter so users can only see their own apps.
 func (a *API) listAppsHandler(c echo.Context) error {
-	ctx := httputil.Context(c)
-
 	userID, err := mcontext.GetUserID(c)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, "login required")
 	}
 
-	summary, err := a.siaSvc.GetAppsSummary(c.Request().Context(), userID)
-	if err != nil {
-		a.Logger().Error("failed to get apps summary", zap.Error(err))
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get apps summary")
-	}
-
-	return httputil.EncodeResponse(ctx, summary, &dto.AppsSummaryResponse{})
+	return queryutilHttp.ProcessListRequest(
+		c.Response(),
+		c.Request(),
+		"apps",
+		func(filters []queryutil.CrudFilter, sorts []queryutil.Sort, pagination queryutil.Pagination) ([]pluginCore.AppAccount, int64, error) {
+			return a.siaSvc.ListApps(c.Request().Context(), userID, filters, sorts, pagination)
+		},
+		func(app pluginCore.AppAccount) dto.AppResponse {
+			return dto.AppResponse{
+				PublicKey:   hex.EncodeToString(app.PublicKey[:]),
+				Name:        app.Name,
+				Description: app.Description,
+				LogoURL:     app.LogoURL,
+				ServiceURL:  app.ServiceURL,
+				PinnedData:  app.PinnedData,
+				LastUsed:    app.LastUsed,
+			}
+		},
+	)
 }
 
 // deleteAppHandler deletes a single app account via the admin client.
@@ -97,16 +112,16 @@ func buildAppsRoutes(a *API) []router.RouteDefinition {
 	))
 
 	return []router.RouteDefinition{
-		// GET /apps — list all apps with usage summary
+		// GET /apps — list all apps (queryutil list endpoint)
 		router.NewRoute(http.MethodGet, "/apps", a.listAppsHandler,
 			router.WithAccess(core.ACCESS_USER_ROLE),
 			authMW,
 			router.WithSwagger(
 				router.WithSummary("List connected apps"),
-				router.WithDescription("Returns a summary of all apps connected to the user's Sia account, including per-app usage and aggregate quota."),
+				router.WithDescription("Returns a paginated, filtered, sorted list of apps connected to the user's Sia account."),
 				router.WithTags(tagApps),
-				router.WithSuccessResponse(http.StatusOK, "Apps summary",
-					router.WithJSONContent(dto.AppsSummaryResponse{}),
+				router.WithSuccessResponse(http.StatusOK, "App list",
+					router.WithJSONContent(dto.AppListResponse{}),
 				),
 				router.WithErrorResponses(
 					router.DefineSwaggerErrorResponse(http.StatusUnauthorized, "Login required"),

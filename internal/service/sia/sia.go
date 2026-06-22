@@ -16,10 +16,10 @@ import (
 	"go.lumeweb.com/portal-plugin-sia/internal/quota"
 	core "go.lumeweb.com/portal/core"
 	db "go.lumeweb.com/portal/db"
+	"go.lumeweb.com/queryutil"
 	"go.sia.tech/core/rhp/v4"
 	"go.sia.tech/core/types"
 	"go.sia.tech/indexd/accounts"
-	"go.sia.tech/indexd/api"
 	"go.sia.tech/indexd/api/admin"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -760,36 +760,65 @@ func (s *SiaService) PruneSlabs(ctx context.Context, siaAppAccountID uint) error
 }
 
 // GetAppsSummary aggregates app account data for a user's Sia account.
-// It calls the admin client to list all accounts under the user's connect key,
-// then builds a summary with per-app details and aggregate usage/quota.
-func (s *SiaService) GetAppsSummary(ctx context.Context, userID uint) (*pluginCore.AppsSummary, error) {
-	ctx, span := core.TraceMethod(ctx, "SiaService.GetAppsSummary")
+// ListApps returns a filtered, sorted, and paginated list of app accounts
+// for the given user. It queries local SiaAppAccount records via GORM with
+// queryutil filters/sorts/pagination, then enriches each result with app
+// metadata from the indexd admin client.
+func (s *SiaService) ListApps(ctx context.Context, userID uint, filters []queryutil.CrudFilter, sorts []queryutil.Sort, pagination queryutil.Pagination) ([]pluginCore.AppAccount, int64, error) {
+	ctx, span := core.TraceMethod(ctx, "SiaService.ListApps")
 	defer span.End()
 
-	// 1. Get the user's Sia account
+	// 1. Get the user's Sia account (provides siaAccountID for the filter)
 	account, err := s.GetAccount(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get sia account: %w", err)
+		return nil, 0, fmt.Errorf("failed to get sia account: %w", err)
 	}
 
+	// 2. Build the GORM query with the injected sia_account_id filter
+	//    plus any user-provided filters/sorts/pagination
+	query := s.DB().Model(&siaDB.SiaAppAccount{}).
+		Where("sia_account_id = ?", account.ID)
+
+	// Apply user-provided filters
+	query = queryutil.ApplyFilters(query, filters, nil)
+
+	// Apply sorts
+	query = queryutil.ApplySort(query, sorts)
+
+	// Get total count before pagination
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, fmt.Errorf("failed to count app accounts: %w", err)
+	}
+
+	// Apply pagination
+	query = queryutil.ApplyPagination(query, pagination)
+
+	// 3. Execute query
+	var appAccounts []siaDB.SiaAppAccount
+	if err := query.Find(&appAccounts).Error; err != nil {
+		return nil, 0, fmt.Errorf("failed to list app accounts: %w", err)
+	}
+
+	// 4. Enrich with indexd admin client data
 	adminClient := s.AdminClient()
 	if adminClient == nil {
-		return nil, fmt.Errorf("admin client not configured")
+		return nil, 0, fmt.Errorf("admin client not configured")
 	}
 
-	// 2. Get all accounts under this connect key
-	accts, err := adminClient.Accounts(ctx, api.WithConnectKey(account.ConnectKey))
-	if err != nil {
-		return nil, fmt.Errorf("failed to list accounts: %w", err)
-	}
+	result := make([]pluginCore.AppAccount, 0, len(appAccounts))
+	for _, appAcct := range appAccounts {
+		pubKey := appAcct.AccountKey.PublicKey()
+		acct, err := adminClient.Account(ctx, pubKey)
+		if err != nil {
+			s.Logger().Error("failed to fetch account from indexd",
+				zap.Uint("appAccountID", appAcct.ID),
+				zap.Error(err))
+			continue
+		}
 
-	// 3. Build the summary
-	summary := &pluginCore.AppsSummary{
-		Apps: make([]pluginCore.AppSummary, 0, len(accts)),
-	}
-
-	for _, acct := range accts {
-		summary.Apps = append(summary.Apps, pluginCore.AppSummary{
+		result = append(result, pluginCore.AppAccount{
+			PublicKey:   pubKey,
 			Name:        acct.App.Name,
 			Description: acct.App.Description,
 			LogoURL:     acct.App.LogoURL,
@@ -799,9 +828,7 @@ func (s *SiaService) GetAppsSummary(ctx context.Context, userID uint) (*pluginCo
 		})
 	}
 
-	summary.AppCount = len(summary.Apps)
-
-	return summary, nil
+	return result, total, nil
 }
 
 // PruneAccount prunes all pinned slabs across all app accounts for a user.
