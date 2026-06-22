@@ -5,6 +5,7 @@ import (
 
 	"go.lumeweb.com/portal-plugin-sia/internal/db"
 	core "go.lumeweb.com/portal/core"
+	"go.lumeweb.com/queryutil"
 	"go.sia.tech/core/types"
 )
 
@@ -39,8 +40,8 @@ type SiaService interface {
 	FindOrphanedSlabs(ctx context.Context, siaAppAccountID uint) ([]string, error)
 	PruneSlabs(ctx context.Context, siaAppAccountID uint) error
 
-	// App summary and account-level pruning
-	GetAppsSummary(ctx context.Context, userID uint) (*AppsSummary, error)
+	// App listing and account-level pruning
+	ListApps(ctx context.Context, userID uint, filters []queryutil.CrudFilter, sorts []queryutil.Sort, pagination queryutil.Pagination) ([]AppAccount, int64, error)
 	PruneAccount(ctx context.Context, userID uint) error
 
 	// Auth request methods

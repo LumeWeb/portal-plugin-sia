@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"go.lumeweb.com/queryutil"
 	"go.sia.tech/core/types"
 	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
 	siaMocks "go.lumeweb.com/portal-plugin-sia/internal/testing/mocks"
@@ -23,7 +24,7 @@ const testPubkeyHex = "000000000000000000000000000000000000000000000000000000000
 var testPubkey = types.PublicKey{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}
 
 // ---------------------------------------------------------------------------
-// GET /apps
+// GET /apps (queryutil list)
 // ---------------------------------------------------------------------------
 
 func TestListApps_Success(t *testing.T) {
@@ -33,29 +34,30 @@ func TestListApps_Success(t *testing.T) {
 
 		mockSiaService := core.GetService[*siaMocks.MockSiaService](ctx, pluginCore.SIA_SERVICE)
 
-		expectedSummary := &pluginCore.AppsSummary{
-			AppCount: 2,
-			Apps: []pluginCore.AppSummary{
-				{
-					Name:        "Test App",
-					Description: "A test application",
-					LogoURL:     "https://example.com/logo.png",
-					ServiceURL:  "https://example.com",
-					PinnedData:  300_000_000,
-					LastUsed:    time.Now().UTC(),
-				},
-				{
-					Name:        "Another App",
-					Description: "Another test app",
-					LogoURL:     "https://example.com/logo2.png",
-					ServiceURL:  "https://example2.com",
-					PinnedData:  200_000_000,
-					LastUsed:    time.Now().UTC(),
-				},
+		expectedApps := []pluginCore.AppAccount{
+			{
+				PublicKey:   testPubkey,
+				Name:        "Test App",
+				Description: "A test application",
+				LogoURL:     "https://example.com/logo.png",
+				ServiceURL:  "https://example.com",
+				PinnedData:  300_000_000,
+				LastUsed:    time.Now().UTC(),
+			},
+			{
+				PublicKey:   types.PublicKey{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2},
+				Name:        "Another App",
+				Description: "Another test app",
+				LogoURL:     "https://example.com/logo2.png",
+				ServiceURL:  "https://example2.com",
+				PinnedData:  200_000_000,
+				LastUsed:    time.Now().UTC(),
 			},
 		}
 
-		mockSiaService.EXPECT().GetAppsSummary(mock.Anything, userID).Return(expectedSummary, nil).Once()
+		mockSiaService.EXPECT().ListApps(
+			mock.Anything, userID, mock.Anything, mock.Anything, mock.Anything,
+		).Return(expectedApps, int64(2), nil).Once()
 
 		resp := helper.makeAuthenticatedRequest(http.MethodGet, "/apps", token, nil)
 
@@ -65,13 +67,14 @@ func TestListApps_Success(t *testing.T) {
 		err := json.Unmarshal(resp.Body.Bytes(), &body)
 		assert.NoError(t, err)
 
-		assert.Equal(t, float64(2), body["appCount"])
+		assert.Equal(t, float64(2), body["total"])
 
-		apps, ok := body["apps"].([]any)
+		data, ok := body["data"].([]any)
 		assert.True(t, ok)
-		assert.Len(t, apps, 2)
+		assert.Len(t, data, 2)
 
-		firstApp := apps[0].(map[string]any)
+		firstApp := data[0].(map[string]any)
+		assert.Equal(t, testPubkeyHex, firstApp["publicKey"])
 		assert.Equal(t, "Test App", firstApp["name"])
 		assert.Equal(t, "A test application", firstApp["description"])
 		assert.Equal(t, "https://example.com/logo.png", firstApp["logoURL"])
@@ -98,12 +101,9 @@ func TestListApps_Empty(t *testing.T) {
 
 		mockSiaService := core.GetService[*siaMocks.MockSiaService](ctx, pluginCore.SIA_SERVICE)
 
-		emptySummary := &pluginCore.AppsSummary{
-			AppCount: 0,
-			Apps:     []pluginCore.AppSummary{},
-		}
-
-		mockSiaService.EXPECT().GetAppsSummary(mock.Anything, userID).Return(emptySummary, nil).Once()
+		mockSiaService.EXPECT().ListApps(
+			mock.Anything, userID, mock.Anything, mock.Anything, mock.Anything,
+		).Return([]pluginCore.AppAccount{}, int64(0), nil).Once()
 
 		resp := helper.makeAuthenticatedRequest(http.MethodGet, "/apps", token, nil)
 
@@ -113,10 +113,65 @@ func TestListApps_Empty(t *testing.T) {
 		err := json.Unmarshal(resp.Body.Bytes(), &body)
 		assert.NoError(t, err)
 
-		assert.Equal(t, float64(0), body["appCount"])
-		apps, ok := body["apps"].([]any)
+		assert.Equal(t, float64(0), body["total"])
+		data, ok := body["data"].([]any)
 		assert.True(t, ok)
-		assert.Len(t, apps, 0)
+		assert.Len(t, data, 0)
+	}, TestOptions)
+}
+
+func TestListApps_WithFilters(t *testing.T) {
+	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
+		helper := newMockHelper(t, ctx)
+		token, userID := helper.SetupAuthenticatedTest()
+
+		mockSiaService := core.GetService[*siaMocks.MockSiaService](ctx, pluginCore.SIA_SERVICE)
+
+		expectedApps := []pluginCore.AppAccount{
+			{
+				PublicKey:   testPubkey,
+				Name:        "Filtered App",
+				Description: "Matches filter",
+				ServiceURL:  "https://example.com",
+				PinnedData:  100_000_000,
+				LastUsed:    time.Now().UTC(),
+			},
+		}
+
+		mockSiaService.EXPECT().ListApps(
+			mock.Anything, userID, mock.Anything, mock.Anything, mock.Anything,
+		).Return(expectedApps, int64(1), nil).Once()
+
+		// Pass queryutil filter params
+		resp := helper.makeAuthenticatedRequest(http.MethodGet, "/apps?filters=%5B%7B%22field%22%3A%22name%22%2C%22operator%22%3A%22eq%22%2C%22value%22%3A%22Filtered%20App%22%7D%5D", token, nil)
+
+		assert.Equal(t, http.StatusOK, resp.Code)
+
+		var body map[string]any
+		err := json.Unmarshal(resp.Body.Bytes(), &body)
+		assert.NoError(t, err)
+
+		assert.Equal(t, float64(1), body["total"])
+		data, ok := body["data"].([]any)
+		assert.True(t, ok)
+		assert.Len(t, data, 1)
+	}, TestOptions)
+}
+
+func TestListApps_InternalError(t *testing.T) {
+	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
+		helper := newMockHelper(t, ctx)
+		token, userID := helper.SetupAuthenticatedTest()
+
+		mockSiaService := core.GetService[*siaMocks.MockSiaService](ctx, pluginCore.SIA_SERVICE)
+
+		mockSiaService.EXPECT().ListApps(
+			mock.Anything, userID, mock.Anything, mock.Anything, mock.Anything,
+		).Return(nil, int64(0), assert.AnError).Once()
+
+		resp := helper.makeAuthenticatedRequest(http.MethodGet, "/apps", token, nil)
+
+		assert.Equal(t, http.StatusInternalServerError, resp.Code)
 	}, TestOptions)
 }
 
@@ -222,3 +277,6 @@ func TestPruneAccount_InternalError(t *testing.T) {
 		assert.Equal(t, http.StatusInternalServerError, resp.Code)
 	}, TestOptions)
 }
+
+// Suppress unused import warning for queryutil (used in mock matching)
+var _ = queryutil.Pagination{}

@@ -11,6 +11,8 @@ import (
 
 	db "go.lumeweb.com/portal-plugin-sia/internal/db"
 
+	filter "go.lumeweb.com/queryutil/filter"
+
 	gorm "gorm.io/gorm"
 
 	mock "github.com/stretchr/testify/mock"
@@ -998,65 +1000,6 @@ func (_c *MockSiaService_GetAppAccountByKey_Call) RunAndReturn(run func(context.
 	return _c
 }
 
-// GetAppsSummary provides a mock function with given fields: ctx, userID
-func (_m *MockSiaService) GetAppsSummary(ctx context.Context, userID uint) (*core.AppsSummary, error) {
-	ret := _m.Called(ctx, userID)
-
-	if len(ret) == 0 {
-		panic("no return value specified for GetAppsSummary")
-	}
-
-	var r0 *core.AppsSummary
-	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, uint) (*core.AppsSummary, error)); ok {
-		return rf(ctx, userID)
-	}
-	if rf, ok := ret.Get(0).(func(context.Context, uint) *core.AppsSummary); ok {
-		r0 = rf(ctx, userID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*core.AppsSummary)
-		}
-	}
-
-	if rf, ok := ret.Get(1).(func(context.Context, uint) error); ok {
-		r1 = rf(ctx, userID)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// MockSiaService_GetAppsSummary_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAppsSummary'
-type MockSiaService_GetAppsSummary_Call struct {
-	*mock.Call
-}
-
-// GetAppsSummary is a helper method to define mock.On call
-//   - ctx context.Context
-//   - userID uint
-func (_e *MockSiaService_Expecter) GetAppsSummary(ctx interface{}, userID interface{}) *MockSiaService_GetAppsSummary_Call {
-	return &MockSiaService_GetAppsSummary_Call{Call: _e.mock.On("GetAppsSummary", ctx, userID)}
-}
-
-func (_c *MockSiaService_GetAppsSummary_Call) Run(run func(ctx context.Context, userID uint)) *MockSiaService_GetAppsSummary_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(uint))
-	})
-	return _c
-}
-
-func (_c *MockSiaService_GetAppsSummary_Call) Return(_a0 *core.AppsSummary, _a1 error) *MockSiaService_GetAppsSummary_Call {
-	_c.Call.Return(_a0, _a1)
-	return _c
-}
-
-func (_c *MockSiaService_GetAppsSummary_Call) RunAndReturn(run func(context.Context, uint) (*core.AppsSummary, error)) *MockSiaService_GetAppsSummary_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // GetAuthRequest provides a mock function with given fields: ctx, requestID
 func (_m *MockSiaService) GetAuthRequest(ctx context.Context, requestID string) (*db.AuthRequest, error) {
 	ret := _m.Called(ctx, requestID)
@@ -1274,6 +1217,75 @@ func (_c *MockSiaService_ListAppAccounts_Call) Return(_a0 []db.SiaAppAccount, _a
 }
 
 func (_c *MockSiaService_ListAppAccounts_Call) RunAndReturn(run func(context.Context, uint) ([]db.SiaAppAccount, error)) *MockSiaService_ListAppAccounts_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListApps provides a mock function with given fields: ctx, userID, filters, sorts, pagination
+func (_m *MockSiaService) ListApps(ctx context.Context, userID uint, filters []filter.CrudFilter, sorts []filter.Sort, pagination filter.Pagination) ([]core.AppAccount, int64, error) {
+	ret := _m.Called(ctx, userID, filters, sorts, pagination)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListApps")
+	}
+
+	var r0 []core.AppAccount
+	var r1 int64
+	var r2 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint, []filter.CrudFilter, []filter.Sort, filter.Pagination) ([]core.AppAccount, int64, error)); ok {
+		return rf(ctx, userID, filters, sorts, pagination)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uint, []filter.CrudFilter, []filter.Sort, filter.Pagination) []core.AppAccount); ok {
+		r0 = rf(ctx, userID, filters, sorts, pagination)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]core.AppAccount)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uint, []filter.CrudFilter, []filter.Sort, filter.Pagination) int64); ok {
+		r1 = rf(ctx, userID, filters, sorts, pagination)
+	} else {
+		r1 = ret.Get(1).(int64)
+	}
+
+	if rf, ok := ret.Get(2).(func(context.Context, uint, []filter.CrudFilter, []filter.Sort, filter.Pagination) error); ok {
+		r2 = rf(ctx, userID, filters, sorts, pagination)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
+}
+
+// MockSiaService_ListApps_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListApps'
+type MockSiaService_ListApps_Call struct {
+	*mock.Call
+}
+
+// ListApps is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID uint
+//   - filters []filter.CrudFilter
+//   - sorts []filter.Sort
+//   - pagination filter.Pagination
+func (_e *MockSiaService_Expecter) ListApps(ctx interface{}, userID interface{}, filters interface{}, sorts interface{}, pagination interface{}) *MockSiaService_ListApps_Call {
+	return &MockSiaService_ListApps_Call{Call: _e.mock.On("ListApps", ctx, userID, filters, sorts, pagination)}
+}
+
+func (_c *MockSiaService_ListApps_Call) Run(run func(ctx context.Context, userID uint, filters []filter.CrudFilter, sorts []filter.Sort, pagination filter.Pagination)) *MockSiaService_ListApps_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uint), args[2].([]filter.CrudFilter), args[3].([]filter.Sort), args[4].(filter.Pagination))
+	})
+	return _c
+}
+
+func (_c *MockSiaService_ListApps_Call) Return(_a0 []core.AppAccount, _a1 int64, _a2 error) *MockSiaService_ListApps_Call {
+	_c.Call.Return(_a0, _a1, _a2)
+	return _c
+}
+
+func (_c *MockSiaService_ListApps_Call) RunAndReturn(run func(context.Context, uint, []filter.CrudFilter, []filter.Sort, filter.Pagination) ([]core.AppAccount, int64, error)) *MockSiaService_ListApps_Call {
 	_c.Call.Return(run)
 	return _c
 }
