@@ -59,7 +59,7 @@ func TestListApps_Success(t *testing.T) {
 			mock.Anything, userID, mock.Anything, mock.Anything, mock.Anything,
 		).Return(expectedApps, int64(2), nil).Once()
 
-		resp := helper.makeAuthenticatedRequest(http.MethodGet, "/api/sia/apps", token, nil)
+		resp := helper.makeAuthenticatedRequest(http.MethodGet, "/api/apps", token, nil)
 
 		assert.Equal(t, http.StatusOK, resp.Code)
 
@@ -88,7 +88,7 @@ func TestListApps_Unauthorized(t *testing.T) {
 		helper := newMockHelper(t, ctx)
 
 		// No token — should get 401
-		resp := helper.makeRequest(http.MethodGet, "/api/sia/apps", nil)
+		resp := helper.makeRequest(http.MethodGet, "/api/apps", nil)
 
 		assert.Equal(t, http.StatusUnauthorized, resp.Code)
 	}, TestOptions)
@@ -105,7 +105,7 @@ func TestListApps_Empty(t *testing.T) {
 			mock.Anything, userID, mock.Anything, mock.Anything, mock.Anything,
 		).Return([]pluginCore.AppAccount{}, int64(0), nil).Once()
 
-		resp := helper.makeAuthenticatedRequest(http.MethodGet, "/api/sia/apps", token, nil)
+		resp := helper.makeAuthenticatedRequest(http.MethodGet, "/api/apps", token, nil)
 
 		assert.Equal(t, http.StatusOK, resp.Code)
 
@@ -143,7 +143,7 @@ func TestListApps_WithFilters(t *testing.T) {
 		).Return(expectedApps, int64(1), nil).Once()
 
 		// Pass queryutil filter params
-		resp := helper.makeAuthenticatedRequest(http.MethodGet, "/api/sia/apps?filters=%5B%7B%22field%22%3A%22name%22%2C%22operator%22%3A%22eq%22%2C%22value%22%3A%22Filtered%20App%22%7D%5D", token, nil)
+		resp := helper.makeAuthenticatedRequest(http.MethodGet, "/api/apps?filters=%5B%7B%22field%22%3A%22name%22%2C%22operator%22%3A%22eq%22%2C%22value%22%3A%22Filtered%20App%22%7D%5D", token, nil)
 
 		assert.Equal(t, http.StatusOK, resp.Code)
 
@@ -169,7 +169,7 @@ func TestListApps_InternalError(t *testing.T) {
 			mock.Anything, userID, mock.Anything, mock.Anything, mock.Anything,
 		).Return(nil, int64(0), assert.AnError).Once()
 
-		resp := helper.makeAuthenticatedRequest(http.MethodGet, "/api/sia/apps", token, nil)
+		resp := helper.makeAuthenticatedRequest(http.MethodGet, "/api/apps", token, nil)
 
 		assert.Equal(t, http.StatusInternalServerError, resp.Code)
 	}, TestOptions)
@@ -189,7 +189,7 @@ func TestDeleteApp_Success(t *testing.T) {
 		// siaAccountID comes from GetAccount (mocked in SetupSiaServiceMocks)
 		mockSiaService.EXPECT().DeleteAppAccount(mock.Anything, mock.AnythingOfType("uint"), testPubkey).Return(nil).Once()
 
-		resp := helper.makeAuthenticatedRequest(http.MethodDelete, "/api/sia/apps/"+testPubkeyHex, token, nil)
+		resp := helper.makeAuthenticatedRequest(http.MethodDelete, "/api/apps/"+testPubkeyHex, token, nil)
 
 		assert.Equal(t, http.StatusNoContent, resp.Code)
 	}, TestOptions)
@@ -201,7 +201,7 @@ func TestDeleteApp_InvalidPubkey(t *testing.T) {
 		token, _ := helper.SetupAuthenticatedTest()
 
 		// "abc" is not valid hex — should return 400 before hitting the service
-		resp := helper.makeAuthenticatedRequest(http.MethodDelete, "/api/sia/apps/abc", token, nil)
+		resp := helper.makeAuthenticatedRequest(http.MethodDelete, "/api/apps/abc", token, nil)
 
 		assert.Equal(t, http.StatusBadRequest, resp.Code)
 	}, TestOptions)
@@ -217,7 +217,7 @@ func TestDeleteApp_NotFound(t *testing.T) {
 		mockSiaService.EXPECT().DeleteAppAccount(mock.Anything, mock.AnythingOfType("uint"), testPubkey).
 			Return(gorm.ErrRecordNotFound).Once()
 
-		resp := helper.makeAuthenticatedRequest(http.MethodDelete, "/api/sia/apps/"+testPubkeyHex, token, nil)
+		resp := helper.makeAuthenticatedRequest(http.MethodDelete, "/api/apps/"+testPubkeyHex, token, nil)
 
 		assert.Equal(t, http.StatusNotFound, resp.Code)
 	}, TestOptions)
@@ -227,7 +227,7 @@ func TestDeleteApp_Unauthorized(t *testing.T) {
 	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
 		helper := newMockHelper(t, ctx)
 
-		resp := helper.makeRequest(http.MethodDelete, "/api/sia/apps/"+testPubkeyHex, nil)
+		resp := helper.makeRequest(http.MethodDelete, "/api/apps/"+testPubkeyHex, nil)
 
 		assert.Equal(t, http.StatusUnauthorized, resp.Code)
 	}, TestOptions)
@@ -246,7 +246,7 @@ func TestPruneAccount_Success(t *testing.T) {
 
 		mockSiaService.EXPECT().PruneAccount(mock.Anything, userID).Return(nil).Once()
 
-		resp := helper.makeAuthenticatedRequest(http.MethodPost, "/api/sia/prune", token, nil)
+		resp := helper.makeAuthenticatedRequest(http.MethodPost, "/api/prune", token, nil)
 
 		assert.Equal(t, http.StatusNoContent, resp.Code)
 	}, TestOptions)
@@ -256,7 +256,7 @@ func TestPruneAccount_Unauthorized(t *testing.T) {
 	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
 		helper := newMockHelper(t, ctx)
 
-		resp := helper.makeRequest(http.MethodPost, "/api/sia/prune", nil)
+		resp := helper.makeRequest(http.MethodPost, "/api/prune", nil)
 
 		assert.Equal(t, http.StatusUnauthorized, resp.Code)
 	}, TestOptions)
@@ -272,7 +272,7 @@ func TestPruneAccount_InternalError(t *testing.T) {
 		mockSiaService.EXPECT().PruneAccount(mock.Anything, userID).
 			Return(assert.AnError).Once()
 
-		resp := helper.makeAuthenticatedRequest(http.MethodPost, "/api/sia/prune", token, nil)
+		resp := helper.makeAuthenticatedRequest(http.MethodPost, "/api/prune", token, nil)
 
 		assert.Equal(t, http.StatusInternalServerError, resp.Code)
 	}, TestOptions)
