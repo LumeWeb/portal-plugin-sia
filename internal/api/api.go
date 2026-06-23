@@ -374,9 +374,13 @@ func (a *API) Configure(r router.Router, accessSvc core.AccessService) error {
 	}
 	router.RegisterRoutes(r, accessSvc, a.Subdomain(), signedRoutes)
 
-	// App management routes (JWT auth required)
+	// App management routes (JWT auth required) — under /api/sia prefix
+	appApi, err := r.Group("/api/sia")
+	if err != nil {
+		return fmt.Errorf("failed to create app API group: %w", err)
+	}
 	appRoutes := buildAppsRoutes(a)
-	router.RegisterRoutes(r, accessSvc, a.Subdomain(), appRoutes)
+	router.RegisterRoutes(appApi, accessSvc, a.Subdomain(), appRoutes)
 
 	return nil
 }
