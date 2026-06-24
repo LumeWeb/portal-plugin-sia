@@ -326,10 +326,10 @@ func (a *API) Configure(r router.Router, accessSvc core.AccessService) error {
 	}
 
 	// Connect approval (JWT auth), register (anonymous), and public status routes
-	if err := a.registerRoutes(r, accessSvc, buildConnectRoutes(a)); err != nil {
+	if err := a.registerRoutes(r, accessSvc, buildConnectRoutes(a), router.WithCors()); err != nil {
 		return fmt.Errorf("failed to register connect routes: %w", err)
 	}
-	if err := a.registerRoutes(r, accessSvc, buildConnectRegisterRoutes(a)); err != nil {
+	if err := a.registerRoutes(r, accessSvc, buildConnectRegisterRoutes(a), router.WithCors()); err != nil {
 		return fmt.Errorf("failed to register connect register routes: %w", err)
 	}
 
@@ -365,7 +365,7 @@ func (a *API) Configure(r router.Router, accessSvc core.AccessService) error {
 			),
 		),
 	}
-	if err := a.registerRoutes(r, accessSvc, connectPublicRoutes); err != nil {
+	if err := a.registerRoutes(r, accessSvc, connectPublicRoutes, router.WithCors()); err != nil {
 		return fmt.Errorf("failed to register connect public routes: %w", err)
 	}
 
@@ -380,7 +380,7 @@ func (a *API) Configure(r router.Router, accessSvc core.AccessService) error {
 		),
 		router.NewRoute(http.MethodPost, "/auth/connect", a.HandlePOSTAuthConnectInit),
 	}
-	if err := a.registerRoutes(r, accessSvc, signedRoutes); err != nil {
+	if err := a.registerRoutes(r, accessSvc, signedRoutes, router.WithCors()); err != nil {
 		return fmt.Errorf("failed to register signed routes: %w", err)
 	}
 
