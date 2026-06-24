@@ -773,6 +773,10 @@ func (s *SiaService) ListApps(ctx context.Context, userID uint, filters []queryu
 	// 1. Get the user's Sia account (provides siaAccountID for the filter)
 	account, err := s.GetAccount(ctx, userID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// User has no Sia account yet — return empty list
+			return []pluginCore.AppAccount{}, 0, nil
+		}
 		return nil, 0, fmt.Errorf("failed to get sia account: %w", err)
 	}
 
@@ -860,10 +864,11 @@ func (s *SiaService) PruneAccount(ctx context.Context, userID uint) error {
 	// 1. Get the user's Sia account
 	account, err := s.GetAccount(ctx, userID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
 		return fmt.Errorf("failed to get sia account: %w", err)
 	}
-
-	// 2. List all app accounts
 	appAccounts, err := s.ListAppAccounts(ctx, account.ID)
 	if err != nil {
 		return fmt.Errorf("failed to list app accounts: %w", err)
