@@ -47,7 +47,7 @@ func (m *mockConfigManager) ResolveEffectiveLimits(ctx context.Context, userID u
 	return nil, args.Error(1)
 }
 
-func (m *mockConfigManager) GetUserQuotaConfig(ctx context.Context, userID uint) (*interface{}, error) {
+func (m *mockConfigManager) GetUserQuotaConfig(ctx context.Context, userID uint) (*quotaCore.UserQuotaConfig, error) {
 	return nil, nil
 }
 
@@ -55,11 +55,11 @@ func (m *mockConfigManager) GetPolicyEnforcer(ctx context.Context, userID uint) 
 	return nil, nil
 }
 
-func (m *mockConfigManager) GetUserAllowanceGrants(ctx context.Context, userID uint) ([]*interface{}, error) {
+func (m *mockConfigManager) GetUserAllowanceGrants(ctx context.Context, userID uint) ([]*quotaCore.AllowanceGrant, error) {
 	return nil, nil
 }
 
-func (m *mockConfigManager) GetUserAllowanceGrantsByType(ctx context.Context, userID uint, grantType interface{}) ([]*interface{}, error) {
+func (m *mockConfigManager) GetUserAllowanceGrantsByType(ctx context.Context, userID uint, grantType quotaCore.GrantType) ([]*quotaCore.AllowanceGrant, error) {
 	return nil, nil
 }
 
@@ -102,6 +102,21 @@ func quotaTestOptionsWithMockAdminAndQuotaCore(t *testing.T) (coreTesting.TestCo
 		coreTesting.WithServiceFactory(pluginCore.QUOTA_SERVICE, NewQuotaService),
 		coreTesting.WithMockServiceFactory(quotaCore.QUOTA_SERVICE, quotaCore.NewMockQuotaService, quotaCore.QuotaConfig{}),
 	), mockAdmin
+}
+
+func quotaTestOptionsWithMockAdminAndQuotaCoreHandle(t *testing.T) (coreTesting.TestContextBuilderOption, *mocks.MockAdminClient, *quotaCore.MockQuotaService) {
+	mockAdmin := mocks.NewMockAdminClient(t)
+	mockQuotaSvc := quotaCore.NewMockQuotaService(t)
+	return coreTesting.CombineOptions(
+		baseQuotaTestOptions(),
+		coreTesting.WithServiceFactory(pluginCore.SIA_SERVICE, func() (core.Service, []core.ContextBuilderOption, error) {
+			return sia.NewSiaServiceWithAdminClient(mockAdmin)
+		}),
+		coreTesting.WithServiceFactory(pluginCore.QUOTA_SERVICE, NewQuotaService),
+		coreTesting.WithServiceFactory(quotaCore.QUOTA_SERVICE, func() (core.Service, []core.ContextBuilderOption, error) {
+			return mockQuotaSvc, nil, nil
+		}),
+	), mockAdmin, mockQuotaSvc
 }
 
 func TestProvisionAccount_Success(t *testing.T) {
@@ -251,6 +266,53 @@ func TestEnforceFundingTarget_WithAccountNoQuotaKey(t *testing.T) {
 
 		assert.NoError(tb, err)
 	}, QuotaTestOptions())
+}
+
+func TestEnforceFundingTarget_AppliesCalculateFundTargetBytes(t *testing.T) {
+	opts, mockAdmin, mockQuotaSvc := quotaTestOptionsWithMockAdminAndQuotaCoreHandle(t)
+
+	userID := uint(200)
+	quotaKey := "user-200"
+	storageLimitBytes := uint64(120 * 1 << 30) // 120 GiB
+	expectedFundTargetBytes := internal.CalculateFundTargetBytes(storageLimitBytes)
+
+	// mock config manager returns limits with a known storage config
+	mockCM := &mockConfigManager{}
+	mockCM.On("ResolveEffectiveLimits", mock.Anything, userID).Return(&quotaCore.EffectiveLimits{
+		HasStorageLimitConfig: true,
+		StorageLimitConfig: &quotaCore.Limit{
+			Bytes: storageLimitBytes,
+		},
+	}, nil)
+
+	mockQuotaSvc.EXPECT().GetConfigManager().Return(mockCM).Maybe()
+	mockQuotaSvc.EXPECT().CheckStorageQuota(mock.Anything, mock.Anything, mock.Anything).Return(quotaCore.QuotaCheckResult{Allowed: true}, nil).Maybe()
+	mockQuotaSvc.EXPECT().CheckUploadQuota(mock.Anything, mock.Anything, mock.Anything).Return(quotaCore.QuotaCheckResult{Allowed: true}, nil).Maybe()
+	mockQuotaSvc.EXPECT().CheckDownloadQuota(mock.Anything, mock.Anything, mock.Anything).Return(quotaCore.QuotaCheckResult{Allowed: true}, nil).Maybe()
+
+	// UpdateFundTargetBytes reads existing quota first (PutQuota is full replace)
+	mockAdmin.EXPECT().Quota(mock.Anything, quotaKey).Return(accounts.Quota{
+		Key:         quotaKey,
+		Description: "test quota",
+	}, nil).Maybe()
+
+	// capture the PutQuota request to verify FundTargetBytes
+	mockAdmin.EXPECT().PutQuota(mock.Anything, quotaKey, mock.MatchedBy(func(req accounts.PutQuotaRequest) bool {
+		return req.FundTargetBytes != nil && *req.FundTargetBytes == expectedFundTargetBytes
+	})).Return(nil).Once()
+
+	coreTesting.RunTestCaseWithDB(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
+		account := &siaDB.SiaAccount{
+			UserID:   userID,
+			QuotaKey: quotaKey,
+		}
+		err := ctx.DB().Create(account).Error
+		assert.NoError(tb, err)
+
+		quotaSvc := core.GetService[pluginCore.QuotaService](ctx, pluginCore.QUOTA_SERVICE)
+		err = quotaSvc.EnforceFundingTarget(context.Background(), userID)
+		assert.NoError(tb, err)
+	}, opts)
 }
 
 func TestConnectQuotaCheck_NoAccount(t *testing.T) {

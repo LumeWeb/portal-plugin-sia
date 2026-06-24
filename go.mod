@@ -16,7 +16,7 @@ require (
 	go.lumeweb.com/portal-router v0.6.16
 	go.sia.tech/core v0.21.1
 	go.sia.tech/coreutils v0.22.1-0.20260609163241-06d70f59a225
-	go.sia.tech/indexd v0.1.1-0.20260621210732-838b6323bd99
+	go.sia.tech/indexd v0.1.1-0.20260624005442-65f7abbb7ea3
 	go.uber.org/zap v1.28.0
 	golang.org/x/net v0.55.0
 	gorm.io/datatypes v1.2.7
@@ -245,4 +245,4 @@ require (
 	modernc.org/sqlite v1.49.1 // indirect
 )
 
-replace go.sia.tech/indexd => go.lumeweb.com/indexd v0.0.0-20260621210732-838b6323bd99
+replace go.sia.tech/indexd => go.lumeweb.com/indexd v0.0.0-20260624005442-65f7abbb7ea3
