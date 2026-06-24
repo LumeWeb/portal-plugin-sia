@@ -292,16 +292,23 @@ func (a *API) OpenAPIInfo() router.APIInfoDefinition {
 		License("MIT", "https://opensource.org/licenses/MIT")
 }
 
+// registerRoutes is a shorthand for RegisterRoutes with the API's standard args.
+func (a *API) registerRoutes(r router.Router, accessSvc core.AccessService, routes []router.RouteDefinition, opts ...router.RouteOption) error {
+	return router.RegisterRoutes(r, accessSvc, a.Subdomain(), routes, opts...)
+}
+
+// jwtAuthMW returns JWT auth middleware for login+API purposes.
+func (a *API) jwtAuthMW() router.RouteOption {
+	return router.WithMiddlewares(middleware.AuthMiddleware(a.Context(),
+		middleware.WithAuthPurpose(jwt.PurposeLogin, jwt.PurposeAPI),
+	))
+}
+
 func (a *API) Configure(r router.Router, accessSvc core.AccessService) error {
 	siaMw := SiaSignedURLMiddleware(a.siaSvc, a.resolvePublicHost())
-
-	siaOpts := []router.RouteOption{
-		router.WithMiddlewares(siaMw),
-		router.WithCors(),
-	}
+	siaOpts := []router.RouteOption{router.WithMiddlewares(siaMw), router.WithCors()}
 
 	// Intercept routes for mutating operations (pin, unpin, prune) use Sia signed URL auth.
-	// These handlers validate quota/existence, proxy to indexd, then record in our DB.
 	interceptRoutes := []router.RouteDefinition{
 		buildPinnedSlabRoute(a),
 		buildDeleteSlabRoute(a),
@@ -309,23 +316,23 @@ func (a *API) Configure(r router.Router, accessSvc core.AccessService) error {
 		buildPinObjectRoute(a),
 		buildDeleteObjectRoute(a),
 	}
-	router.RegisterRoutes(r, accessSvc, a.Subdomain(), interceptRoutes, siaOpts...)
+	if err := a.registerRoutes(r, accessSvc, interceptRoutes, siaOpts...); err != nil {
+		return fmt.Errorf("failed to register intercept routes: %w", err)
+	}
 
 	// Read-only proxy routes use Sia signed URL auth
-	proxyRoutes := buildProxyRoutes(a)
-	router.RegisterRoutes(r, accessSvc, a.Subdomain(), proxyRoutes, siaOpts...)
+	if err := a.registerRoutes(r, accessSvc, buildProxyRoutes(a), siaOpts...); err != nil {
+		return fmt.Errorf("failed to register proxy routes: %w", err)
+	}
 
-	// Connect approval route (requires JWT auth only, no Sia signed URL)
-	// Connect init is in signedRoutes below (anonymous, no auth required)
-	// Connect register uses custom handler to create SiaAppAccount record
-	connectRoutes := buildConnectRoutes(a)
-	router.RegisterRoutes(r, accessSvc, a.Subdomain(), connectRoutes)
+	// Connect approval (JWT auth), register (anonymous), and public status routes
+	if err := a.registerRoutes(r, accessSvc, buildConnectRoutes(a)); err != nil {
+		return fmt.Errorf("failed to register connect routes: %w", err)
+	}
+	if err := a.registerRoutes(r, accessSvc, buildConnectRegisterRoutes(a)); err != nil {
+		return fmt.Errorf("failed to register connect register routes: %w", err)
+	}
 
-	// Connect register route (anonymous — indexd validates signed URL, creates SiaAppAccount on success)
-	connectRegisterRoutes := buildConnectRegisterRoutes(a)
-	router.RegisterRoutes(r, accessSvc, a.Subdomain(), connectRegisterRoutes)
-
-	// Connect public routes (no auth — indexd validates signed URL for status, UI page handles auth internally)
 	connectPublicRoutes := []router.RouteDefinition{
 		router.NewRoute(http.MethodGet, "/auth/connect/:requestID", a.HandleGETAuthConnect,
 			router.WithMiddlewares(middleware.AuthMiddleware(a.Context(),
@@ -358,9 +365,10 @@ func (a *API) Configure(r router.Router, accessSvc core.AccessService) error {
 			),
 		),
 	}
-	router.RegisterRoutes(r, accessSvc, a.Subdomain(), connectPublicRoutes)
+	if err := a.registerRoutes(r, accessSvc, connectPublicRoutes); err != nil {
+		return fmt.Errorf("failed to register connect public routes: %w", err)
+	}
 
-	// Signed-only routes (no portal JWT auth required — indexd validates signed URL)
 	signedRoutes := []router.RouteDefinition{
 		router.NewRoute(http.MethodGet, "/auth/check", echo.WrapHandler(a.proxy),
 			router.WithSwagger(
@@ -372,15 +380,18 @@ func (a *API) Configure(r router.Router, accessSvc core.AccessService) error {
 		),
 		router.NewRoute(http.MethodPost, "/auth/connect", a.HandlePOSTAuthConnectInit),
 	}
-	router.RegisterRoutes(r, accessSvc, a.Subdomain(), signedRoutes)
+	if err := a.registerRoutes(r, accessSvc, signedRoutes); err != nil {
+		return fmt.Errorf("failed to register signed routes: %w", err)
+	}
 
 	// App management routes (JWT auth required) — under /api prefix
 	appApi, err := r.Group("/api")
 	if err != nil {
 		return fmt.Errorf("failed to create app API group: %w", err)
 	}
-	appRoutes := buildAppsRoutes(a)
-	router.RegisterRoutes(appApi, accessSvc, a.Subdomain(), appRoutes)
+	if err := a.registerRoutes(appApi, accessSvc, buildAppsRoutes(a), router.WithCors()); err != nil {
+		return fmt.Errorf("failed to register app routes: %w", err)
+	}
 
 	return nil
 }
@@ -489,7 +500,7 @@ func buildConnectRoutes(a *API) []router.RouteDefinition {
 		// Approve/reject connect - requires JWT auth
 		router.NewRoute(http.MethodPost, "/auth/connect/:requestID", a.HandlePOSTAuthConnect,
 			router.WithAccess(core.ACCESS_USER_ROLE),
-			router.WithMiddlewares(middleware.AuthMiddleware(a.Context(), middleware.WithAuthPurpose(jwt.PurposeLogin, jwt.PurposeAPI))),
+			a.jwtAuthMW(),
 			router.WithSwagger(
 				router.WithSummary("Approve or reject a connection request"),
 				router.WithDescription("Approves or rejects an application connection request."),

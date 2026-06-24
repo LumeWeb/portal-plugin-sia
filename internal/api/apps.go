@@ -6,9 +6,7 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	jwt "go.lumeweb.com/portal-middleware/auth/jwt"
 	mcontext "go.lumeweb.com/portal-middleware/context"
-	middleware "go.lumeweb.com/portal-middleware/middleware"
 	router "go.lumeweb.com/portal-router"
 	core "go.lumeweb.com/portal/core"
 	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
@@ -71,6 +69,9 @@ func (a *API) deleteAppHandler(c echo.Context) error {
 	// Get the user's Sia account
 	account, err := a.siaSvc.GetAccount(c.Request().Context(), userID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return echo.NewHTTPError(http.StatusNotFound, "sia account not found")
+		}
 		a.Logger().Error("failed to get sia account", zap.Error(err))
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to get account")
 	}
@@ -107,9 +108,7 @@ const tagApps = "Apps"
 
 // buildAppsRoutes returns JWT-authenticated routes for app management.
 func buildAppsRoutes(a *API) []router.RouteDefinition {
-	authMW := router.WithMiddlewares(middleware.AuthMiddleware(a.Context(),
-		middleware.WithAuthPurpose(jwt.PurposeLogin, jwt.PurposeAPI),
-	))
+	authMW := a.jwtAuthMW()
 
 	return []router.RouteDefinition{
 		// GET /apps — list all apps (queryutil list endpoint)
