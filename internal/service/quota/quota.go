@@ -177,7 +177,7 @@ func (s *QuotaService) EnforceFundingTarget(ctx context.Context, userID uint) er
 					return nil
 				}
 
-				fundTargetBytes = limits.StorageLimitConfig.Bytes
+				fundTargetBytes = internalPkg.CalculateFundTargetBytes(limits.StorageLimitConfig.Bytes)
 
 				// Check storage quota
 				storageResult, err := quotaPkg.CheckStorageQuota(ctx, s.Context(), userID, 0)
