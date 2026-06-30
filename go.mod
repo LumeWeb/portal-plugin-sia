@@ -10,10 +10,13 @@ require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/stretchr/testify v1.11.1
 	go.lumeweb.com/configmanager v0.3.28
+	go.lumeweb.com/httputil v0.5.4
 	go.lumeweb.com/portal v0.4.2-0.20260509024515-4dd10c3de19d
 	go.lumeweb.com/portal-middleware v0.3.7
 	go.lumeweb.com/portal-plugin-quota v0.0.0-20260425220337-a342aa31f1f8
 	go.lumeweb.com/portal-router v0.6.16
+	go.lumeweb.com/queryutil v0.3.16
+	go.lumeweb.com/web/go/portal-plugin-sia v0.0.0-20260630053457-d84cb76aa9af
 	go.sia.tech/core v0.21.1
 	go.sia.tech/coreutils v0.22.1-0.20260609163241-06d70f59a225
 	go.sia.tech/indexd v0.1.1-0.20260624005442-65f7abbb7ea3
@@ -186,8 +189,6 @@ require (
 	go.etcd.io/etcd/client/v3 v3.6.11 // indirect
 	go.lumeweb.com/event/v2 v2.1.0 // indirect
 	go.lumeweb.com/gswagger v0.20.12 // indirect
-	go.lumeweb.com/httputil v0.5.4 // indirect
-	go.lumeweb.com/queryutil v0.3.16 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/bridges/otelzap v0.18.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/runtime v0.68.0 // indirect

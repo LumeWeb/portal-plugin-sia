@@ -13,6 +13,7 @@ import (
 	quotaService "go.lumeweb.com/portal-plugin-sia/internal/service/quota"
 	siaService "go.lumeweb.com/portal-plugin-sia/internal/service/sia"
 	core "go.lumeweb.com/portal/core"
+	portal_plugin_sia "go.lumeweb.com/web/go/portal-plugin-sia"
 )
 
 func GetCollectors() []prometheus.Collector {
@@ -58,6 +59,7 @@ func GetPluginInfo() core.PluginInfo {
 			core.DB_TYPE_MYSQL:  migrations.GetMySQL(),
 		},
 		Metrics: GetCollectors(),
+		WebBundles: core.NewWebBundles(core.NewWebBundle(portal_plugin_sia.GetFS(), core.WithWebBundleTargetApps("dashboard"))),
 		CronJobs: []core.PluginCronJob{
 			{
 				Name: "funding_sync",
