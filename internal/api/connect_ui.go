@@ -251,12 +251,12 @@ func (a *API) HandleGETAuthConnect(c echo.Context) error {
 			a.Logger().Error("failed to parse dashboard URL", zap.Error(err))
 			return echo.NewHTTPError(http.StatusInternalServerError, "internal error")
 		}
-		dest.RawQuery = url.Values{"return": {c.Request().URL.String()}}.Encode()
+		dest.RawQuery = url.Values{"to": {c.Request().URL.String()}}.Encode()
 
 		return c.Redirect(http.StatusFound, dest.String())
 	}
 
-  	quotaResult, err := a.quotaSvc.ConnectQuotaCheck(ctx, userID)
+	quotaResult, err := a.quotaSvc.ConnectQuotaCheck(ctx, userID)
 	if err != nil {
 		a.Logger().Error("failed to check connect quota", zap.Uint("userID", userID), zap.Error(err))
 	} else if quotaResult != nil {
