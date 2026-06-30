@@ -19,7 +19,7 @@ require (
 	go.lumeweb.com/web/go/portal-plugin-sia v0.0.0-20260630053457-d84cb76aa9af
 	go.sia.tech/core v0.21.1
 	go.sia.tech/coreutils v0.22.1-0.20260609163241-06d70f59a225
-	go.sia.tech/indexd v0.1.1-0.20260624005442-65f7abbb7ea3
+	go.sia.tech/indexd v0.1.1-0.20260630071444-1576b7f97da5
 	go.uber.org/zap v1.28.0
 	golang.org/x/net v0.55.0
 	gorm.io/datatypes v1.2.7
@@ -115,7 +115,7 @@ require (
 	github.com/kenshaw/snaker v0.4.3 // indirect
 	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
-	github.com/klauspost/reedsolomon v1.14.0 // indirect
+	github.com/klauspost/reedsolomon v1.14.1 // indirect
 	github.com/knadh/koanf/maps v0.1.2 // indirect
 	github.com/knadh/koanf/parsers/json v1.0.0 // indirect
 	github.com/knadh/koanf/parsers/yaml v1.1.0 // indirect
@@ -246,4 +246,4 @@ require (
 	modernc.org/sqlite v1.49.1 // indirect
 )
 
-replace go.sia.tech/indexd => go.lumeweb.com/indexd v0.0.0-20260624005442-65f7abbb7ea3
+replace go.sia.tech/indexd => go.lumeweb.com/indexd v0.0.0-20260630071444-1576b7f97da5
