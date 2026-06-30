@@ -206,7 +206,7 @@ func TestAuthConnectUI_UnauthenticatedRedirect(t *testing.T) {
 
 		assert.Equal(t, http.StatusFound, resp.Code)
 		loc := resp.Header().Get("Location")
-		assert.Contains(t, loc, "return=")
+		assert.Contains(t, loc, "to=")
 	}, TestOptions)
 }
 
