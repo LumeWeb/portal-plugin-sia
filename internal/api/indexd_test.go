@@ -207,6 +207,9 @@ func TestAuthConnectUI_UnauthenticatedRedirect(t *testing.T) {
 		assert.Equal(t, http.StatusFound, resp.Code)
 		loc := resp.Header().Get("Location")
 		assert.Contains(t, loc, "to=")
+		// Verify the full Sia subdomain URL is in the redirect, not just the path.
+		// url.Values.Encode() URL-encodes the value, so / becomes %2F.
+		assert.Contains(t, loc, "%2Fauth%2Fconnect%2Ftest-request-id")
 	}, TestOptions)
 }
 

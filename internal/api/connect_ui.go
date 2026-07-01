@@ -251,7 +251,7 @@ func (a *API) HandleGETAuthConnect(c echo.Context) error {
 			a.Logger().Error("failed to parse dashboard URL", zap.Error(err))
 			return echo.NewHTTPError(http.StatusInternalServerError, "internal error")
 		}
-		dest.RawQuery = url.Values{"to": {c.Request().URL.String()}}.Encode()
+		dest.RawQuery = url.Values{"to": {a.resolvePublicURL() + c.Request().URL.String()}}.Encode()
 
 		return c.Redirect(http.StatusFound, dest.String())
 	}
