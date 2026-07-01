@@ -112,7 +112,6 @@ func TestPruneSlabsParameterized(t *testing.T) {
 
 				// Setup mocks for 7 slabs being deleted
 				for i := 0; i < 7; i++ {
-					mockPinSvc.EXPECT().UploadPinnedGlobal(mock.Anything, storageHashMatcher()).Return(false, nil).Once()
 					mockPinSvc.EXPECT().GetAllPinsByHash(mock.Anything, storageHashMatcher()).Return([]*models.Pin{}, nil).Once()
 					mockUploadSvc.EXPECT().DeleteUpload(mock.Anything, storageHashMatcher()).Return(nil).Maybe()
 				}
@@ -187,7 +186,6 @@ func TestPruneSlabsParameterized(t *testing.T) {
 				// But PruneSlabs calls DeleteObjectsByAppAccount first, which deletes obj1 too
 				// → all 3 slabs become orphaned and get pruned
 				for range 3 {
-					mockPinSvc.EXPECT().UploadPinnedGlobal(mock.Anything, storageHashMatcher()).Return(false, nil).Once()
 					mockPinSvc.EXPECT().GetAllPinsByHash(mock.Anything, storageHashMatcher()).Return([]*models.Pin{}, nil).Once()
 					mockUploadSvc.EXPECT().DeleteUpload(mock.Anything, storageHashMatcher()).Return(nil).Maybe()
 				}
@@ -215,7 +213,6 @@ func TestPruneSlabsParameterized(t *testing.T) {
 
 				// Setup mocks for 4 slabs being deleted
 				for i := 0; i < 4; i++ {
-					mockPinSvc.EXPECT().UploadPinnedGlobal(mock.Anything, storageHashMatcher()).Return(false, nil).Once()
 					mockPinSvc.EXPECT().GetAllPinsByHash(mock.Anything, storageHashMatcher()).Return([]*models.Pin{}, nil).Once()
 					mockUploadSvc.EXPECT().DeleteUpload(mock.Anything, storageHashMatcher()).Return(nil).Maybe()
 				}
@@ -242,7 +239,6 @@ func TestPruneSlabsParameterized(t *testing.T) {
 
 				// Setup mocks for 3 slabs being deleted
 				for i := 0; i < 3; i++ {
-					mockPinSvc.EXPECT().UploadPinnedGlobal(mock.Anything, storageHashMatcher()).Return(false, nil).Once()
 					mockPinSvc.EXPECT().GetAllPinsByHash(mock.Anything, storageHashMatcher()).Return([]*models.Pin{}, nil).Once()
 					mockUploadSvc.EXPECT().DeleteUpload(mock.Anything, storageHashMatcher()).Return(nil).Maybe()
 				}
@@ -251,7 +247,7 @@ func TestPruneSlabsParameterized(t *testing.T) {
 			},
 		},
 		{
-			name: "GlobalPin_Exists_SkipsDeletionButDeletesOthers",
+			name: "GlobalPin_NoLongerSkipsDeletion_AllDeleted",
 			setupFunc: func(ctx context.Context, svc *SiaService, ctxTest core.Context, mockPinSvc *coreMocks.MockPinService, mockUploadSvc *coreMocks.MockUploadService) (uint, int, int) {
 				account := createAccount(ctxTest)
 
@@ -263,17 +259,17 @@ func TestPruneSlabsParameterized(t *testing.T) {
 				err = svc.DeleteObject(ctx, account.ID, "obj")
 				require.NoError(t, err)
 
-				// First slab is pinned globally (simulates another user having a pin)
-				mockPinSvc.EXPECT().UploadPinnedGlobal(mock.Anything, storageHashMatcher()).Return(true, nil).Once()
-				// Second and third are not pinned globally - proceed with deletion
-				mockPinSvc.EXPECT().UploadPinnedGlobal(mock.Anything, storageHashMatcher()).Return(false, nil).Once()
+				// All 3 slabs are orphaned - all should be cleaned up
+				// (previously UploadPinnedGlobal would skip some, but that
+				// caused quota leaks when the pin was an orphan)
 				mockPinSvc.EXPECT().GetAllPinsByHash(mock.Anything, storageHashMatcher()).Return([]*models.Pin{}, nil).Once()
 				mockUploadSvc.EXPECT().DeleteUpload(mock.Anything, storageHashMatcher()).Return(nil).Maybe()
-				mockPinSvc.EXPECT().UploadPinnedGlobal(mock.Anything, storageHashMatcher()).Return(false, nil).Once()
+				mockPinSvc.EXPECT().GetAllPinsByHash(mock.Anything, storageHashMatcher()).Return([]*models.Pin{}, nil).Once()
+				mockUploadSvc.EXPECT().DeleteUpload(mock.Anything, storageHashMatcher()).Return(nil).Maybe()
 				mockPinSvc.EXPECT().GetAllPinsByHash(mock.Anything, storageHashMatcher()).Return([]*models.Pin{}, nil).Once()
 				mockUploadSvc.EXPECT().DeleteUpload(mock.Anything, storageHashMatcher()).Return(nil).Maybe()
 
-				return account.ID, 3, 2
+				return account.ID, 3, 3
 			},
 		},
 		{
@@ -301,7 +297,6 @@ func TestPruneSlabsParameterized(t *testing.T) {
 
 				// Setup mocks for 100 slabs being deleted
 				for i := 0; i < 100; i++ {
-					mockPinSvc.EXPECT().UploadPinnedGlobal(mock.Anything, storageHashMatcher()).Return(false, nil).Once()
 					mockPinSvc.EXPECT().GetAllPinsByHash(mock.Anything, storageHashMatcher()).Return([]*models.Pin{}, nil).Once()
 					mockUploadSvc.EXPECT().DeleteUpload(mock.Anything, storageHashMatcher()).Return(nil).Maybe()
 				}
@@ -357,7 +352,6 @@ func TestPruneSlabsConcurrent(t *testing.T) {
 
 		// Set up mocks for all potential deletions
 		for i := 0; i < totalSlabs; i++ {
-			mockPinSvc.EXPECT().UploadPinnedGlobal(mock.Anything, storageHashMatcher()).Return(false, nil).Maybe()
 			mockPinSvc.EXPECT().GetAllPinsByHash(mock.Anything, storageHashMatcher()).Return([]*models.Pin{}, nil).Maybe()
 			mockUploadSvc.EXPECT().DeleteUpload(mock.Anything, storageHashMatcher()).Return(nil).Maybe()
 		}

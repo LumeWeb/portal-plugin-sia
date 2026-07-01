@@ -709,7 +709,9 @@ func (s *SiaService) PruneSlabs(ctx context.Context, siaAppAccountID uint) error
 			continue
 		}
 
-		// 3c. Check: does the corresponding upload have any pins globally?
+		// 3c. No other app account uses this slab - the portal's slab pin
+		// is now an orphan. indexd already pruned the slab data, so there's
+		// no real data left to protect. Clean up pins, uploads, and quota.
 		storageHash, hashErr := internal.NewSiaHash(slabID)
 		if hashErr != nil {
 			s.Logger().Error("invalid slab ID hash",
@@ -717,20 +719,8 @@ func (s *SiaService) PruneSlabs(ctx context.Context, siaAppAccountID uint) error
 				zap.Error(hashErr))
 			continue
 		}
-		pinned, err := pinSvc.UploadPinnedGlobal(ctx, storageHash)
-		if err != nil {
-			s.Logger().Error("failed to check global pin status",
-				zap.String("slabID", slabID),
-				zap.Error(err))
-			continue
-		}
-		if pinned {
-			// Upload still pinned globally by someone - skip
-			continue
-		}
 
-		// 3d. Truly orphaned - delete pins and uploads to reduce quota
-		// Find all pins for this hash (across all users)
+		// 3d. Delete all pins for this hash (across all users)
 		allPins, err := pinSvc.GetAllPinsByHash(ctx, storageHash)
 		if err != nil {
 			s.Logger().Error("failed to get pins by hash",
