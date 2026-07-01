@@ -313,7 +313,6 @@ func TestPruneSlabs_FullyOrphaned_DeletesPinAndUpload(t *testing.T) {
 		mockPinSvc := core.GetService[*coreMocks.MockPinService](ctx, core.PIN_SERVICE)
 		mockUploadSvc := core.GetService[*coreMocks.MockUploadService](ctx, core.UPLOAD_SERVICE)
 
-		mockPinSvc.EXPECT().UploadPinnedGlobal(mock.Anything, storageHashMatcher()).Return(false, nil)
 		mockPinSvc.EXPECT().GetAllPinsByHash(mock.Anything, storageHashMatcher()).Return([]*models.Pin{
 			{Model: gorm.Model{ID: 1}, UserID: 1, UploadID: 1},
 		}, nil)
@@ -329,7 +328,7 @@ func TestPruneSlabs_FullyOrphaned_DeletesPinAndUpload(t *testing.T) {
 	}, TestOptions)
 }
 
-func TestPruneSlabs_StillPinnedGlobally_SkipsDeletion(t *testing.T) {
+func TestPruneSlabs_OrphanedSlab_CleansUpPinAndUpload(t *testing.T) {
 	coreTesting.RunTestCaseWithDB(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
 		siaSvc := core.GetService[pluginCore.SiaService](ctx, pluginCore.SIA_SERVICE)
 
@@ -346,7 +345,9 @@ func TestPruneSlabs_StillPinnedGlobally_SkipsDeletion(t *testing.T) {
 		require.NoError(tb, err)
 
 		mockPinSvc := core.GetService[*coreMocks.MockPinService](ctx, core.PIN_SERVICE)
-		mockPinSvc.EXPECT().UploadPinnedGlobal(mock.Anything, storageHashMatcher()).Return(true, nil)
+		mockPinSvc.EXPECT().GetAllPinsByHash(mock.Anything, mock.Anything).Return([]*models.Pin{}, nil).Once()
+		mockUploadSvc := core.GetService[*coreMocks.MockUploadService](ctx, core.UPLOAD_SERVICE)
+		mockUploadSvc.EXPECT().DeleteUpload(mock.Anything, mock.Anything).Return(nil).Once()
 
 		err = siaSvc.PruneSlabs(ctx, appAccount.ID)
 		require.NoError(tb, err)
@@ -409,7 +410,6 @@ func TestPruneSlabs_NoOrphans_NoError(t *testing.T) {
 		mockPinSvc := core.GetService[*coreMocks.MockPinService](ctx, core.PIN_SERVICE)
 		mockUploadSvc := core.GetService[*coreMocks.MockUploadService](ctx, core.UPLOAD_SERVICE)
 		// Slab becomes orphaned after object deleted; check shows not pinned globally
-		mockPinSvc.EXPECT().UploadPinnedGlobal(mock.Anything, storageHashMatcher()).Return(false, nil)
 		// No pins exist for this hash
 		mockPinSvc.EXPECT().GetAllPinsByHash(mock.Anything, storageHashMatcher()).Return([]*models.Pin{}, nil)
 		// Delete the upload
