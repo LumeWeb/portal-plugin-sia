@@ -10,9 +10,9 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
+	"go.lumeweb.com/portal-plugin-sia/internal"
 	pluginConfig "go.lumeweb.com/portal-plugin-sia/internal/config"
 	siaDB "go.lumeweb.com/portal-plugin-sia/internal/db"
-	"go.lumeweb.com/portal-plugin-sia/internal"
 	"go.lumeweb.com/portal-plugin-sia/internal/events"
 	"go.lumeweb.com/portal-plugin-sia/internal/quota"
 	core "go.lumeweb.com/portal/core"
@@ -205,8 +205,7 @@ func (s *SiaService) DeleteAppAccount(ctx context.Context, siaAccountID uint, ac
 	// 1. Find the app account by public key, verifying ownership
 	var appAccount siaDB.SiaAppAccount
 	err := db.RetryableComponentLock(s, func(tx *gorm.DB) *gorm.DB {
-		return tx.Joins("JOIN sia_account_keys ON sia_account_keys.id = sia_app_accounts.account_key_id").
-			Where("sia_account_keys.public_key = ? AND sia_app_accounts.sia_account_id = ?", accountKey[:], siaAccountID).
+		return tx.Where("account_key = ? AND sia_account_id = ?", accountKey[:], siaAccountID).
 			First(&appAccount)
 	})
 	if err != nil {
