@@ -749,11 +749,16 @@ func (s *SiaService) PruneSlabs(ctx context.Context, siaAppAccountID uint) error
 			quota.EmitStorageObjectUnpinned(ctx, s.Context(), pin, "")
 		}
 
-		// Delete the upload
+		// Delete the upload if it still exists
 		if err := uploadSvc.DeleteUpload(ctx, storageHash); err != nil {
-			s.Logger().Error("failed to delete upload",
-				zap.String("slabID", slabID),
-				zap.Error(err))
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				s.Logger().Debug("upload already deleted",
+					zap.String("slabID", slabID))
+			} else {
+				s.Logger().Error("failed to delete upload",
+					zap.String("slabID", slabID),
+					zap.Error(err))
+			}
 		}
 	}
 
