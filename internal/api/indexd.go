@@ -55,15 +55,20 @@ func (a *API) pinAndRecord(c echo.Context, dataSize uint64, mimeType string, kno
 		return nil
 	}
 
-	result, err := quota.CheckWithReservation(ctx, a.Context(), quota.CheckTypeStorage, userID, dataSize, quota.CheckStorageQuota)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusPaymentRequired, err.Error())
-	}
-
+	// Objects are virtual (dataSize=0): skip quota check and event emission.
+	// Storage is tracked via the slab pin, not the object pin.
+	var result *quotaCore.QuotaCheckResult
 	var reservationID *string
-	if result != nil && result.Reservation != nil {
-		rid := result.Reservation.UUID()
-		reservationID = &rid
+	if dataSize > 0 {
+		result, err = quota.CheckWithReservation(ctx, a.Context(), quota.CheckTypeStorage, userID, dataSize, quota.CheckStorageQuota)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusPaymentRequired, err.Error())
+		}
+
+		if result != nil && result.Reservation != nil {
+			rid := result.Reservation.UUID()
+			reservationID = &rid
+		}
 	}
 
 	recorder := newResponseRecorder(c.Response().Writer)
@@ -120,7 +125,11 @@ func (a *API) pinAndRecord(c echo.Context, dataSize uint64, mimeType string, kno
 	if err != nil {
 		a.Logger().Error("failed to create pin", zap.Error(err))
 	} else {
-		quota.EmitStorageObjectPinned(ctx, a.Context(), createdPin, c.RealIP(), reservationID)
+		// Skip storage event for virtual object pins (dataSize=0).
+		// Storage is tracked via the slab pin, not the object pin.
+		if dataSize > 0 {
+			quota.EmitStorageObjectPinned(ctx, a.Context(), createdPin, c.RealIP(), reservationID)
+		}
 		if err := quota.EnforceFundingTarget(core.DetachContext(ctx), a.Context(), userID); err != nil {
 			a.Logger().Error("failed to enforce funding target", zap.Error(err))
 		}
@@ -223,11 +232,6 @@ func (a *API) pinObjectHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid request body")
 	}
 
-	var totalLength uint64
-	for _, slab := range req.Slabs {
-		totalLength += uint64(slab.Length)
-	}
-
 	c.Request().Body = io.NopCloser(bytes.NewReader(body))
 
 	objectHash, hashErr := internal.NewSiaHash(req.ID.String())
@@ -235,7 +239,10 @@ func (a *API) pinObjectHandler(c echo.Context) error {
 		return hashErr
 	}
 
-	err = a.pinAndRecord(c, totalLength, pluginCore.MimeTypeSiaObject, objectHash, func(recorder *responseRecorder) (pinResult, error) {
+	// Objects are virtual: they reference slabs that hold the real data.
+	// Storage quota is tracked via the slab pin, not the object pin.
+	// Record 0 bytes to avoid double-counting.
+	err = a.pinAndRecord(c, 0, pluginCore.MimeTypeSiaObject, objectHash, func(recorder *responseRecorder) (pinResult, error) {
 		// Register object and its slab relationships after successful proxy
 		if appAccountID, ok := getSiaAppAccountID(c); ok {
 			slabIDs := make([]string, 0, len(req.Slabs))
@@ -254,13 +261,18 @@ func (a *API) pinObjectHandler(c echo.Context) error {
 			return pinResult{}, fmt.Errorf("invalid object ID: %w", innerErr)
 		}
 
+		totalDataSize := uint64(0)
+		for _, slab := range req.Slabs {
+			totalDataSize += uint64(slab.Length)
+		}
+
 		return pinResult{
 			storageHash: objectStorageHash,
 			metadata: quotaCore.SlabMetadata{
 				MinShards:    0,
 				TotalSectors: uint64(len(req.Slabs)),
-				DataSize:     totalLength,
-				TotalSize:    totalLength,
+				DataSize:     totalDataSize,
+				TotalSize:    totalDataSize,
 			},
 		}, nil
 	})
@@ -389,12 +401,28 @@ func (a *API) deletePinAndUpload(ctx context.Context, hashStr string, userID uin
 	}
 
 	pin, err := a.pinSvc.GetPinByHash(ctx, storageHash, userID)
-	if err != nil || pin == nil {
+	if err != nil {
+		a.Logger().Error("failed to get pin for deletion",
+			zap.String("hash", hashStr),
+			zap.Error(err))
+		return nil
+	}
+	if pin == nil {
+		a.Logger().Debug("pin not found for deletion, already removed",
+			zap.String("hash", hashStr))
 		return nil
 	}
 
 	upload, err := a.uploadSvc.GetUploadByID(ctx, pin.UploadID)
-	if err != nil || upload == nil {
+	if err != nil {
+		a.Logger().Error("failed to get upload for pin deletion",
+			zap.String("hash", hashStr),
+			zap.Error(err))
+		return nil
+	}
+	if upload == nil {
+		a.Logger().Debug("upload not found for pin deletion, already removed",
+			zap.String("hash", hashStr))
 		return nil
 	}
 
@@ -408,7 +436,11 @@ func (a *API) deletePinAndUpload(ctx context.Context, hashStr string, userID uin
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to clean up records")
 	}
 
-	quota.EmitStorageObjectUnpinned(c.Request().Context(), a.Context(), pin, c.RealIP())
+	// Skip storage event for virtual object pins (Size=0).
+	// Legacy object pins may have Size>0 and need quota release.
+	if upload.Size > 0 {
+		quota.EmitStorageObjectUnpinned(c.Request().Context(), a.Context(), pin, c.RealIP())
+	}
 	if err := quota.EnforceFundingTarget(core.DetachContext(ctx), a.Context(), userID); err != nil {
 		a.Logger().Error("failed to enforce funding target", zap.Error(err))
 	}
