@@ -70,7 +70,7 @@
       resultTitle.textContent = approved ? "Connection approved" : "Connection rejected";
       resultDesc.textContent = approved ? "You can return to the application." : "Connection has been rejected.";
       result.classList.add("visible");
-      try { window.close(); } catch(e) {}
+      setTimeout(function() { try { window.close(); } catch(e) {} }, 2000);
     }
 
     function submit(approve) {
