@@ -226,7 +226,8 @@ func TestAuthConnectUI_AuthenticatedRendersPage(t *testing.T) {
 		assert.Contains(t, body, `src="https://example.com/logo.png"`)
 		assert.Contains(t, body, "Test App")
 		assert.Contains(t, body, "A test application")
-		assert.Contains(t, body, `var callbackURL = "https:\/\/example.com\/callback"`)
+		assert.NotContains(t, body, "result-btn")
+		assert.NotContains(t, body, "Return to app")
 	}, TestOptions)
 }
 

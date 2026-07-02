@@ -37,18 +37,15 @@
   </div>
   <h2 id="result-title" class="result-title"></h2>
   <p id="result-description" class="result-description"></p>
-  <button type="button" id="result-btn" class="btn"></button>
 </div>
 
 <script>
   (function() {
-    var callbackURL = "{{.CallbackURL}}";
     var form = document.getElementById("connect-form");
     var result = document.getElementById("result");
     var resultIcon = document.getElementById("result-icon");
     var resultTitle = document.getElementById("result-title");
     var resultDesc = document.getElementById("result-description");
-    var resultBtn = document.getElementById("result-btn");
     var errorContainer = document.getElementById("error-container");
     var buttons = form.querySelectorAll('[data-action]');
 
@@ -71,16 +68,9 @@
       form.style.display = "none";
       resultIcon.className = "result-icon " + (approved ? "icon-approved" : "icon-rejected");
       resultTitle.textContent = approved ? "Connection approved" : "Connection rejected";
-      resultDesc.textContent = approved ? "You can return to the application." : "You can close this window and return to the application.";
-      resultBtn.className = "btn " + (approved ? "btn-primary" : "btn-ghost");
-      resultBtn.textContent = approved ? "Return to app" : "Close";
+      resultDesc.textContent = approved ? "You can return to the application." : "Connection has been rejected.";
       result.classList.add("visible");
-      resultBtn.focus();
-    }
-
-    function navigateAway() {
-      if (callbackURL) window.location.href = callbackURL;
-      else window.close();
+      try { window.close(); } catch(e) {}
     }
 
     function submit(approve) {
@@ -113,12 +103,6 @@
 
     buttons.forEach(function(btn) {
       btn.addEventListener("click", function() { submit(btn.dataset.action === "approve"); });
-    });
-
-    resultBtn.addEventListener("click", navigateAway);
-
-    document.addEventListener("keydown", function(e) {
-      if (e.key === "Escape" && result.classList.contains("visible")) navigateAway();
     });
   })();
 </script>
