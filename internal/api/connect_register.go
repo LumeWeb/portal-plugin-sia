@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -31,44 +30,19 @@ func (a *API) HandlePOSTAuthConnectRegister(c echo.Context) error {
 
 	ctx := c.Request().Context()
 
-	// Build target URL preserving signed URL query params (sc, ss, sv)
 	targetURL, err := a.buildAppURL(c.Request().URL, fmt.Sprintf("/auth/connect/%s/register", requestID))
 	if err != nil {
 		a.Logger().Error("failed to build proxy URL", zap.Error(err))
 		return echo.NewHTTPError(http.StatusInternalServerError, "internal error")
 	}
 
-	proxyReq, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		targetURL,
-		bytes.NewReader(body),
-	)
+	result, err := a.proxyToIndexd(c, http.MethodPost, targetURL, body, a.resolvePublicHost(), http.StatusNoContent, "", "")
 	if err != nil {
-		a.Logger().Error("failed to create proxy request", zap.Error(err))
-		return echo.NewHTTPError(http.StatusInternalServerError, "internal error")
-	}
-
-	proxyReq.Header.Set("Content-Type", c.Request().Header.Get("Content-Type"))
-	proxyReq.Header.Set("User-Agent", c.Request().Header.Get("User-Agent"))
-	proxyReq.Host = a.resolvePublicHost()
-
-	client := &http.Client{}
-	resp, err := client.Do(proxyReq)
-	if err != nil {
-		a.Logger().Error("failed to proxy request to indexd", zap.Error(err))
-		return echo.NewHTTPError(http.StatusBadGateway, "upstream error")
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		a.Logger().Error("failed to read upstream response", zap.Error(err))
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to read response")
+		return err
 	}
 
 	// On success from indexd, create the app account record
-	if resp.StatusCode == http.StatusNoContent {
+	if result.StatusCode == http.StatusNoContent {
 		var reqBody indexdApp.RegisterAppKeyRequest
 		if err := json.Unmarshal(body, &reqBody); err == nil {
 			siaService := a.siaSvc
@@ -95,9 +69,6 @@ func (a *API) HandlePOSTAuthConnectRegister(c echo.Context) error {
 		}
 	}
 
-	copyProxyResponseHeaders(c.Response().Writer, resp)
-	c.Response().Status = resp.StatusCode
-	c.Response().Write(respBody)
-
+	writeProxyResponse(c, result)
 	return nil
 }

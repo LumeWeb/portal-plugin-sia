@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -10,7 +9,6 @@ import (
 
 	"github.com/labstack/echo/v4"
 	indexdApp "go.sia.tech/indexd/api/app"
-
 	"go.uber.org/zap"
 )
 
@@ -18,9 +16,6 @@ import (
 // It requires only Sia signed URL auth (no JWT required).
 // It intercepts the response from indexd to rewrite URLs to point to the portal.
 func (a *API) HandlePOSTAuthConnectInit(c echo.Context) error {
-	ctx := c.Request().Context()
-
-	// Read request body
 	body, err := io.ReadAll(c.Request().Body)
 	if err != nil {
 		a.Logger().Error("failed to read request body", zap.Error(err))
@@ -28,62 +23,28 @@ func (a *API) HandlePOSTAuthConnectInit(c echo.Context) error {
 	}
 	defer c.Request().Body.Close()
 
-	// Build target URL for indexd (internal, no /api prefix), preserving signed URL query params
 	targetURL, err := a.buildAppURL(c.Request().URL, "/auth/connect")
 	if err != nil {
 		a.Logger().Error("failed to build proxy URL", zap.Error(err))
 		return echo.NewHTTPError(http.StatusInternalServerError, "internal error")
 	}
 
-	// Create proxy request
-	proxyReq, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		targetURL,
-		bytes.NewReader(body),
-	)
+	result, err := a.proxyToIndexd(c, http.MethodPost, targetURL, body, a.resolvePublicHost(), http.StatusOK, "", "")
 	if err != nil {
-		a.Logger().Error("failed to create proxy request", zap.Error(err))
-		return echo.NewHTTPError(http.StatusInternalServerError, "internal error")
+		return err
 	}
 
-	// Copy headers
-	proxyReq.Header.Set("Content-Type", c.Request().Header.Get("Content-Type"))
-	proxyReq.Header.Set("User-Agent", c.Request().Header.Get("User-Agent"))
-	proxyReq.Host = a.resolvePublicHost()
-
-	// Execute request
-	client := &http.Client{}
-	resp, err := client.Do(proxyReq)
-	if err != nil {
-		a.Logger().Error("failed to proxy request to indexd", zap.Error(err))
-		return echo.NewHTTPError(http.StatusBadGateway, "upstream error")
-	}
-	defer resp.Body.Close()
-
-	// Read response body
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		a.Logger().Error("failed to read upstream response", zap.Error(err))
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to read response")
-	}
-
-	// If not OK, return as-is
-	if resp.StatusCode != http.StatusOK {
-		copyProxyResponseHeaders(c.Response().Writer, resp)
-		c.Response().Status = resp.StatusCode
-		c.Response().Write(respBody)
+	if result.StatusCode != http.StatusOK {
+		writeProxyResponse(c, result)
 		return nil
 	}
 
-	// Parse the response
 	var registerResp indexdApp.RegisterAppResponse
-	if err := json.Unmarshal(respBody, &registerResp); err != nil {
+	if err := json.Unmarshal(result.Body, &registerResp); err != nil {
 		a.Logger().Error("failed to unmarshal RegisterAppResponse", zap.Error(err))
 		return echo.NewHTTPError(http.StatusInternalServerError, "invalid upstream response")
 	}
 
-	// Extract requestID from ResponseURL (e.g., "http://indexd/auth/connect/abc123")
 	requestID := path.Base(registerResp.ResponseURL)
 	if requestID == "" || requestID == "/" {
 		a.Logger().Error("failed to extract requestID from ResponseURL", zap.String("responseURL", registerResp.ResponseURL))
@@ -91,16 +52,12 @@ func (a *API) HandlePOSTAuthConnectInit(c echo.Context) error {
 	}
 
 	// Rewrite URLs to point to portal
-	// Original: <indexd.AdvertiseURL>/auth/connect/<requestID>
-	// Target:   <portal.URL>/auth/connect/<requestID>
 	portalBaseURL := a.resolvePublicURL()
-
 	registerResp.ResponseURL = fmt.Sprintf("%s/auth/connect/%s", portalBaseURL, requestID)
 	registerResp.StatusURL = fmt.Sprintf("%s/auth/connect/%s/status", portalBaseURL, requestID)
 	registerResp.RegisterURL = fmt.Sprintf("%s/auth/connect/%s/register", portalBaseURL, requestID)
 
-	// Return rewritten response
 	c.Response().Header().Set("Content-Type", "application/json")
-	c.Response().Status = resp.StatusCode
+	c.Response().Status = result.StatusCode
 	return json.NewEncoder(c.Response()).Encode(registerResp)
 }
