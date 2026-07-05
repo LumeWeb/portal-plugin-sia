@@ -12,6 +12,7 @@ import (
 	mcontext "go.lumeweb.com/portal-middleware/context"
 	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
 	"go.sia.tech/core/types"
+	"go.uber.org/zap"
 )
 
 const (
@@ -27,13 +28,21 @@ const (
 // parameters against the provided hostname, looks up the associated Sia
 // account, and sets the Portal userID in the Echo context so downstream
 // handlers can use mcontext.GetUserID unchanged.
-func SiaSignedURLMiddleware(siaService pluginCore.SiaService, hostname string) echo.MiddlewareFunc {
+func SiaSignedURLMiddleware(siaService pluginCore.SiaService, hostname string, logger *zap.Logger) echo.MiddlewareFunc {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
 
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			req := c.Request()
 
 			if !isSignedRequest(req) {
+				logger.Debug("sia auth rejected: missing signed URL parameters",
+					zap.String("method", req.Method),
+					zap.String("path", req.URL.Path),
+					zap.String("host", hostname),
+				)
 				return echo.NewHTTPError(http.StatusUnauthorized,
 					fmt.Sprintf("missing required query parameters: %q, %q, %q",
 						queryParamCredential, queryParamSignature, queryParamValidUntil))
@@ -41,44 +50,96 @@ func SiaSignedURLMiddleware(siaService pluginCore.SiaService, hostname string) e
 
 			pk, err := parseCredential(req)
 			if err != nil {
+				logger.Debug("sia auth rejected: invalid credential parameter",
+					zap.String("method", req.Method),
+					zap.String("path", req.URL.Path),
+					zap.String("host", hostname),
+					zap.Error(err),
+				)
 				return echo.NewHTTPError(http.StatusUnauthorized,
 					fmt.Sprintf("invalid %q parameter: %v", queryParamCredential, err))
 			}
 
 			sig, err := parseSignature(req)
 			if err != nil {
+				logger.Debug("sia auth rejected: invalid signature parameter",
+					zap.String("method", req.Method),
+					zap.String("path", req.URL.Path),
+					zap.String("host", hostname),
+					zap.Error(err),
+				)
 				return echo.NewHTTPError(http.StatusUnauthorized,
 					fmt.Sprintf("invalid %q parameter: %v", queryParamSignature, err))
 			}
 
 			validUntil, err := parseValidUntil(req)
 			if err != nil {
+				logger.Debug("sia auth rejected: invalid validUntil parameter",
+					zap.String("method", req.Method),
+					zap.String("path", req.URL.Path),
+					zap.String("host", hostname),
+					zap.Error(err),
+				)
 				return echo.NewHTTPError(http.StatusUnauthorized,
 					fmt.Sprintf("invalid %q parameter: %v", queryParamValidUntil, err))
 			}
 
 			if validUntil.Before(time.Now().UTC()) {
+				logger.Debug("sia auth rejected: signature expired",
+					zap.String("method", req.Method),
+					zap.String("path", req.URL.Path),
+					zap.String("host", hostname),
+					zap.Time("validUntil", validUntil),
+				)
 				return echo.NewHTTPError(http.StatusUnauthorized, "signature expired")
 			}
 
 			body, err := io.ReadAll(req.Body)
 			if err != nil {
+				logger.Debug("sia auth rejected: failed to read request body",
+					zap.String("method", req.Method),
+					zap.String("path", req.URL.Path),
+					zap.String("host", hostname),
+					zap.Error(err),
+				)
 				return echo.NewHTTPError(http.StatusUnauthorized, "failed to read request body")
 			}
 			req.Body = io.NopCloser(bodyReader(body))
 
 			hash := requestHash(req.Method, hostname, req.URL.Path, validUntil, body)
 			if !pk.VerifyHash(hash, sig) {
+				logger.Debug("sia auth rejected: signature verification failed",
+					zap.String("method", req.Method),
+					zap.String("host", hostname),
+					zap.String("path", req.URL.Path),
+					zap.Time("validUntil", validUntil),
+					zap.Int("bodyLen", len(body)),
+				)
 				return echo.NewHTTPError(http.StatusUnauthorized, "invalid signature")
 			}
 
 			appAccount, err := siaService.GetAppAccountByKey(req.Context(), pk)
 			if err != nil {
+				logger.Debug("sia auth rejected: app account not found",
+					zap.String("method", req.Method),
+					zap.String("path", req.URL.Path),
+					zap.String("host", hostname),
+					zap.Stringer("publicKey", pk),
+					zap.Error(err),
+				)
 				return echo.NewHTTPError(http.StatusUnauthorized, "unknown account")
 			}
 
 			siaAccount, err := siaService.GetAccountByID(req.Context(), appAccount.SiaAccountID)
 			if err != nil {
+				logger.Debug("sia auth rejected: sia account not found",
+					zap.String("method", req.Method),
+					zap.String("path", req.URL.Path),
+					zap.Stringer("publicKey", pk),
+					zap.Uint("appAccountID", appAccount.ID),
+					zap.Uint("siaAccountID", appAccount.SiaAccountID),
+					zap.Error(err),
+				)
 				return echo.NewHTTPError(http.StatusUnauthorized, "unknown sia account")
 			}
 

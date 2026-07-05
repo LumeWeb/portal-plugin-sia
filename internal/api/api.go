@@ -10,13 +10,13 @@ import (
 	"github.com/labstack/echo/v4"
 	jwt "go.lumeweb.com/portal-middleware/auth/jwt"
 	middleware "go.lumeweb.com/portal-middleware/middleware"
+	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
 	"go.lumeweb.com/portal-plugin-sia/internal"
 	"go.lumeweb.com/portal-plugin-sia/internal/api/dto"
 	pluginConfig "go.lumeweb.com/portal-plugin-sia/internal/config"
 	router "go.lumeweb.com/portal-router"
 	"go.lumeweb.com/portal/config"
 	core "go.lumeweb.com/portal/core"
-	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
 
 	// Import indexd types for swagger documentation
 	indexdApp "go.sia.tech/indexd/api/app"
@@ -305,7 +305,7 @@ func (a *API) jwtAuthMW() router.RouteOption {
 }
 
 func (a *API) Configure(r router.Router, accessSvc core.AccessService) error {
-	siaMw := SiaSignedURLMiddleware(a.siaSvc, a.resolvePublicHost())
+	siaMw := SiaSignedURLMiddleware(a.siaSvc, a.resolvePublicHost(), a.Logger().Logger)
 	siaOpts := []router.RouteOption{router.WithMiddlewares(siaMw), router.WithCors()}
 
 	// Intercept routes for mutating operations (pin, unpin, prune) use Sia signed URL auth.

@@ -3,7 +3,6 @@ package api
 import (
 	"fmt"
 	"html/template"
-	"io"
 	"net/http"
 	"net/url"
 	"slices"
@@ -205,35 +204,17 @@ func (a *API) HandleGETAuthConnect(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "internal error")
 	}
 
-	proxyReq, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, nil)
+	result, err := a.proxyToIndexd(c, http.MethodGet, targetURL, nil, a.resolvePublicHost(), http.StatusOK)
 	if err != nil {
-		a.Logger().Error("failed to create proxy request", zap.Error(err))
-		return echo.NewHTTPError(http.StatusInternalServerError, "internal error")
+		return err
 	}
 
-	proxyReq.Header.Set("User-Agent", c.Request().Header.Get("User-Agent"))
-	proxyReq.Host = a.resolvePublicHost()
-
-	client := &http.Client{}
-	resp, err := client.Do(proxyReq)
-	if err != nil {
-		a.Logger().Error("failed to proxy request to indexd", zap.Error(err))
-		return echo.NewHTTPError(http.StatusBadGateway, "upstream error")
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		a.Logger().Error("failed to read upstream response", zap.Error(err))
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to read response")
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		copyProxyResponseHeaders(c.Response().Writer, resp)
-		c.Response().Status = resp.StatusCode
-		c.Response().Write(respBody)
+	if result.StatusCode != http.StatusOK {
+		writeProxyResponse(c, result)
 		return nil
 	}
+
+	respBody := result.Body
 
 	data, err := parseAuthConnectHTML(string(respBody))
 	if err != nil {
