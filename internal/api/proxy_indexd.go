@@ -23,9 +23,13 @@ type indexdProxyResult struct {
 // successCode is the HTTP status code the caller considers successful. Any other
 // status is logged as a rejection and returned for the caller to forward.
 //
+// If basicAuthUser and basicAuthPass are non-empty, Basic Auth is set on the
+// proxy request. This is used by the approve/reject endpoint to pass the user's
+// connect key to indexd.
+//
 // On transport error, an echo.HTTPError is returned and the caller should
 // propagate it directly.
-func (a *API) proxyToIndexd(ctx echo.Context, method, targetURL string, body []byte, host string, successCode int) (*indexdProxyResult, error) {
+func (a *API) proxyToIndexd(ctx echo.Context, method, targetURL string, body []byte, host string, successCode int, basicAuthUser, basicAuthPass string) (*indexdProxyResult, error) {
 	proxyReq, err := http.NewRequestWithContext(
 		ctx.Request().Context(),
 		method,
@@ -42,6 +46,10 @@ func (a *API) proxyToIndexd(ctx echo.Context, method, targetURL string, body []b
 	}
 	proxyReq.Header.Set("User-Agent", ctx.Request().Header.Get("User-Agent"))
 	proxyReq.Host = host
+
+	if basicAuthUser != "" || basicAuthPass != "" {
+		proxyReq.SetBasicAuth(basicAuthUser, basicAuthPass)
+	}
 
 	resp, err := http.DefaultClient.Do(proxyReq)
 	if err != nil {

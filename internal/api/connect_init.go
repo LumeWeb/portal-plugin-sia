@@ -29,7 +29,7 @@ func (a *API) HandlePOSTAuthConnectInit(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "internal error")
 	}
 
-	result, err := a.proxyToIndexd(c, http.MethodPost, targetURL, body, a.resolvePublicHost(), http.StatusOK)
+	result, err := a.proxyToIndexd(c, http.MethodPost, targetURL, body, a.resolvePublicHost(), http.StatusOK, "", "")
 	if err != nil {
 		return err
 	}

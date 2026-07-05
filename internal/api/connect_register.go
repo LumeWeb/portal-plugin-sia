@@ -36,7 +36,7 @@ func (a *API) HandlePOSTAuthConnectRegister(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, "internal error")
 	}
 
-	result, err := a.proxyToIndexd(c, http.MethodPost, targetURL, body, a.resolvePublicHost(), http.StatusNoContent)
+	result, err := a.proxyToIndexd(c, http.MethodPost, targetURL, body, a.resolvePublicHost(), http.StatusNoContent, "", "")
 	if err != nil {
 		return err
 	}
