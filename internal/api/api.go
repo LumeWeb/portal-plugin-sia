@@ -249,6 +249,11 @@ func (a *API) appendPort(base string) string {
 // "; charset=utf-8" by default, causing the match to fail.
 func copyProxyResponseHeaders(dst http.ResponseWriter, src *http.Response) {
 	for key, values := range src.Header {
+		// Skip CORS headers — the portal's own CORS middleware sets these.
+		// Copying them from the upstream response produces duplicate headers.
+		if isCorsHeader(key) {
+			continue
+		}
 		for _, value := range values {
 			dst.Header().Add(key, value)
 		}
@@ -258,6 +263,21 @@ func copyProxyResponseHeaders(dst http.ResponseWriter, src *http.Response) {
 			dst.Header().Set("Content-Type", before)
 		}
 	}
+}
+
+// isCorsHeader returns true for CORS-related response headers that should not
+// be copied from upstream responses, since the portal's CORS middleware sets them.
+func isCorsHeader(key string) bool {
+	switch http.CanonicalHeaderKey(key) {
+	case "Access-Control-Allow-Origin",
+		"Access-Control-Allow-Methods",
+		"Access-Control-Allow-Headers",
+		"Access-Control-Allow-Credentials",
+		"Access-Control-Expose-Headers",
+		"Access-Control-Max-Age":
+		return true
+	}
+	return false
 }
 
 // buildAppURL constructs a URL to the indexd app API with the given path,
