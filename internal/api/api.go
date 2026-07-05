@@ -190,6 +190,18 @@ func NewAPI() (core.API, []core.ContextBuilderOption, error) {
 					req.URL.Host = target.Host
 					req.Host = publicHost
 				},
+				ModifyResponse: func(resp *http.Response) error {
+					// Strip CORS headers from the upstream indexd response.
+					// The portal's own WithCors() middleware sets these.
+					// Without this, the browser sees duplicate Access-Control-Allow-Origin
+					// values and blocks the response.
+					for key := range resp.Header {
+						if isCorsHeader(key) {
+							resp.Header.Del(key)
+						}
+					}
+					return nil
+				},
 			}
 
 			return nil
