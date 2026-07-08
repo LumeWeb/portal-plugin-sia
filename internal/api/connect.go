@@ -2,12 +2,14 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
 	mcontext "go.lumeweb.com/portal-middleware/context"
+	quotaSvc "go.lumeweb.com/portal-plugin-sia/internal/service/quota"
 	"go.uber.org/zap"
 )
 
@@ -45,6 +47,10 @@ func (a *API) HandlePOSTAuthConnect(c echo.Context) error {
 	account, err := siaService.GetAccount(ctx, userID)
 	if err != nil || len(account.ConnectKey) == 0 {
 		if err := a.quotaSvc.ProvisionAccount(ctx, userID); err != nil {
+			if errors.Is(err, quotaSvc.ErrAccountNotVerified) {
+				a.Logger().Warn("provision blocked: user account not verified", zap.Uint("userID", userID))
+				return echo.NewHTTPError(http.StatusForbidden, "account not verified. Please verify your email and try again.")
+			}
 			a.Logger().Error("failed to provision account", zap.Uint("userID", userID), zap.Error(err))
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to provision account")
 		}

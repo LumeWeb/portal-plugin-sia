@@ -150,7 +150,7 @@ func TestProvisionAccount_UnverifiedUser(t *testing.T) {
 		err := quotaSvc.ProvisionAccount(context.Background(), 1)
 
 		assert.Error(tb, err)
-		assert.Contains(tb, err.Error(), "not verified")
+		assert.ErrorIs(tb, err, ErrAccountNotVerified)
 	}, opts)
 }
 
