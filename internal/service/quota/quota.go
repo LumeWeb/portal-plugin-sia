@@ -22,6 +22,8 @@ import (
 
 var _ pluginCore.QuotaService = (*QuotaService)(nil)
 
+var ErrAccountNotVerified = errors.New("user account not verified")
+
 type QuotaService struct {
 	*core.BaseComponent
 	siaService pluginCore.SiaService
@@ -76,7 +78,7 @@ func (s *QuotaService) ProvisionAccount(ctx context.Context, userID uint) error 
 				return nil
 			})
 			if !verified {
-				return errors.New("user account not verified")
+				return ErrAccountNotVerified
 			}
 
 			account, err := s.siaService.RegisterAccount(ctx, userID)
