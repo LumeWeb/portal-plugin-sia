@@ -8,11 +8,12 @@ import (
 
 	quotaCore "go.lumeweb.com/portal-plugin-quota/core"
 	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
-	siaDB "go.lumeweb.com/portal-plugin-sia/internal/db"
 	internalPkg "go.lumeweb.com/portal-plugin-sia/internal"
+	siaDB "go.lumeweb.com/portal-plugin-sia/internal/db"
 	quotaPkg "go.lumeweb.com/portal-plugin-sia/internal/quota"
 	core "go.lumeweb.com/portal/core"
 	db "go.lumeweb.com/portal/db"
+	"go.opentelemetry.io/otel/attribute"
 	"go.sia.tech/core/types"
 	"go.sia.tech/indexd/accounts"
 	"go.sia.tech/indexd/api/admin"
@@ -93,23 +94,23 @@ func (s *QuotaService) ProvisionAccount(ctx context.Context, userID uint) error 
 			quotaKey := fmt.Sprintf("user-%d", userID)
 
 			var fundTargetBytes uint64
-		core.WithService[quotaCore.QuotaService](s.Context(), quotaCore.QUOTA_SERVICE, func(qs quotaCore.QuotaService) error {
-			configManager := qs.GetConfigManager()
-			if configManager != nil {
-				limits, err := configManager.ResolveEffectiveLimits(ctx, userID)
-				if err == nil && limits != nil && limits.HasStorageLimitConfig && limits.StorageLimitConfig != nil {
-					fundTargetBytes = internalPkg.CalculateFundTargetBytes(limits.StorageLimitConfig.Bytes)
+			core.WithService[quotaCore.QuotaService](s.Context(), quotaCore.QUOTA_SERVICE, func(qs quotaCore.QuotaService) error {
+				configManager := qs.GetConfigManager()
+				if configManager != nil {
+					limits, err := configManager.ResolveEffectiveLimits(ctx, userID)
+					if err == nil && limits != nil && limits.HasStorageLimitConfig && limits.StorageLimitConfig != nil {
+						fundTargetBytes = internalPkg.CalculateFundTargetBytes(limits.StorageLimitConfig.Bytes)
+					}
 				}
-			}
-			return nil
-		})
+				return nil
+			})
 
-		quotaReq := accounts.PutQuotaRequest{
-			Description:     fmt.Sprintf("Portal user %d", userID),
-			MaxPinnedData:   math.MaxInt64,
-			TotalUses:       math.MaxInt32,
-			FundTargetBytes: &fundTargetBytes,
-		}
+			quotaReq := accounts.PutQuotaRequest{
+				Description:     fmt.Sprintf("Portal user %d", userID),
+				MaxPinnedData:   math.MaxInt64,
+				TotalUses:       math.MaxInt32,
+				FundTargetBytes: &fundTargetBytes,
+			}
 
 			if err := s.siaService.AdminClient().PutQuota(ctx, quotaKey, quotaReq); err != nil {
 				return fmt.Errorf("failed to create indexd quota: %w", err)
@@ -329,17 +330,28 @@ func (s *QuotaService) SyncFunding(ctx context.Context) error {
 
 			const pageSize = 500
 			hasMore := true
+			var totalProcessed, totalSkipped int64
 
 			for hasMore {
-				events, err := s.siaService.AdminClient().FundingEvents(ctx, fundingCursor, pageSize)
+				pageCtx, pageSpan := core.TraceMethod(ctx, "QuotaService.SyncFunding.fetchPage")
+
+				events, err := s.siaService.AdminClient().FundingEvents(pageCtx, fundingCursor, pageSize)
 				if err != nil {
+					pageSpan.End()
 					s.Logger().Error("failed to fetch funding events", zap.Error(err))
 					return err
 				}
 
 				if len(events) == 0 {
+					pageSpan.End()
 					break
 				}
+
+				pageSpan.SetAttributes(
+					attribute.Int64("events.count", int64(len(events))),
+					attribute.Int64("funding_cursor.id", fundingCursor.ID),
+				)
+				pageSpan.End()
 
 				// 3. Process each event — look up account on-demand
 				for _, event := range events {
@@ -353,6 +365,7 @@ func (s *QuotaService) SyncFunding(ctx context.Context) error {
 						if event.QuotaName == nil || *event.QuotaName == "" {
 							s.Logger().Debug("pool funding event has no quota name, skipping",
 								zap.Int64("eventID", event.ID))
+							totalSkipped++
 							continue
 						}
 						acc, err := s.siaService.GetAccountByQuotaKey(ctx, *event.QuotaName)
@@ -360,6 +373,7 @@ func (s *QuotaService) SyncFunding(ctx context.Context) error {
 							s.Logger().Debug("no sia account found for quota key",
 								zap.String("quotaKey", *event.QuotaName),
 								zap.Int64("eventID", event.ID))
+							totalSkipped++
 							continue
 						}
 						account = *acc
@@ -367,18 +381,21 @@ func (s *QuotaService) SyncFunding(ctx context.Context) error {
 						// Account funding events: look up via AccountKey → SiaAppAccount → SiaAccount
 						appAccount, err := s.siaService.GetAppAccountByKey(ctx, types.PublicKey(event.AccountKey))
 						if err != nil {
+							totalSkipped++
 							continue
 						}
 
-						if err := db.RetryableComponentLock(s, func(tx *gorm.DB) *gorm.DB {
+						if err := db.RetryableComponentTransaction(s, ctx, func(tx *gorm.DB) *gorm.DB {
 							return tx.Where("id = ?", appAccount.SiaAccountID).First(&account)
 						}); err != nil {
+							totalSkipped++
 							continue
 						}
 					}
 
 					// Dedup: skip events we've already processed for this account
 					if event.ID <= account.LastFundingEventID {
+						totalSkipped++
 						continue
 					}
 
@@ -389,8 +406,10 @@ func (s *QuotaService) SyncFunding(ctx context.Context) error {
 						return tx.Save(&account)
 					}); err != nil {
 						s.Logger().Error("failed to update account funding state", zap.Uint("userID", account.UserID), zap.Error(err))
+						totalSkipped++
 						continue
 					}
+					totalProcessed++
 
 					// Record bytes with quota system
 					if event.EstimatedUploadBytes > 0 {
@@ -422,6 +441,11 @@ func (s *QuotaService) SyncFunding(ctx context.Context) error {
 					return err
 				}
 			}
+
+			span.SetAttributes(
+				attribute.Int64("events.processed", totalProcessed),
+				attribute.Int64("events.skipped", totalSkipped),
+			)
 
 			return nil
 		},

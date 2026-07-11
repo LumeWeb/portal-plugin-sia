@@ -93,7 +93,7 @@ func (s *SiaService) GetAuthRequest(ctx context.Context, requestID string) (*sia
 	defer span.End()
 
 	var ar siaDB.AuthRequest
-	err := db.RetryableComponentLock(s, func(tx *gorm.DB) *gorm.DB {
+	err := db.RetryableComponentTransaction(s, ctx, func(tx *gorm.DB) *gorm.DB {
 		return tx.Where("request_id = ?", requestID).First(&ar)
 	})
 	if err != nil {
@@ -166,7 +166,7 @@ func (s *SiaService) GetAppAccountByKey(ctx context.Context, accountKey types.Pu
 	defer span.End()
 
 	var appAccount siaDB.SiaAppAccount
-	err := db.RetryableComponentLock(s, func(tx *gorm.DB) *gorm.DB {
+	err := db.RetryableComponentTransaction(s, ctx, func(tx *gorm.DB) *gorm.DB {
 		return tx.Where("account_key = ?", siaDB.DBAccountKeyFromPublicKey(accountKey)).First(&appAccount)
 	})
 	if err != nil {
@@ -180,7 +180,7 @@ func (s *SiaService) ListAppAccounts(ctx context.Context, siaAccountID uint) ([]
 	defer span.End()
 
 	var appAccounts []siaDB.SiaAppAccount
-	err := db.RetryableComponentLock(s, func(tx *gorm.DB) *gorm.DB {
+	err := db.RetryableComponentTransaction(s, ctx, func(tx *gorm.DB) *gorm.DB {
 		return tx.Where("sia_account_id = ?", siaAccountID).Find(&appAccounts)
 	})
 	return appAccounts, err
@@ -204,7 +204,7 @@ func (s *SiaService) DeleteAppAccount(ctx context.Context, siaAccountID uint, ac
 
 	// 1. Find the app account by public key, verifying ownership
 	var appAccount siaDB.SiaAppAccount
-	err := db.RetryableComponentLock(s, func(tx *gorm.DB) *gorm.DB {
+	err := db.RetryableComponentTransaction(s, ctx, func(tx *gorm.DB) *gorm.DB {
 		return tx.Where("account_key = ? AND sia_account_id = ?", accountKey[:], siaAccountID).
 			First(&appAccount)
 	})
@@ -276,7 +276,7 @@ func (s *SiaService) GetAccount(ctx context.Context, userID uint) (*siaDB.SiaAcc
 		GetAccountTotal.WithLabelValues(LabelStatusError),
 		func() (*siaDB.SiaAccount, error) {
 			var account siaDB.SiaAccount
-			err := db.RetryableComponentLock(s, func(tx *gorm.DB) *gorm.DB {
+			err := db.RetryableComponentTransaction(s, ctx, func(tx *gorm.DB) *gorm.DB {
 				return tx.Where("user_id = ?", userID).First(&account)
 			})
 			if err != nil {
@@ -292,7 +292,7 @@ func (s *SiaService) GetAccountByID(ctx context.Context, id uint) (*siaDB.SiaAcc
 	defer span.End()
 
 	var account siaDB.SiaAccount
-	err := db.RetryableComponentLock(s, func(tx *gorm.DB) *gorm.DB {
+	err := db.RetryableComponentTransaction(s, ctx, func(tx *gorm.DB) *gorm.DB {
 		return tx.First(&account, id)
 	})
 	if err != nil {
@@ -306,7 +306,7 @@ func (s *SiaService) GetAccountByQuotaKey(ctx context.Context, quotaKey string) 
 	defer span.End()
 
 	var account siaDB.SiaAccount
-	err := db.RetryableComponentLock(s, func(tx *gorm.DB) *gorm.DB {
+	err := db.RetryableComponentTransaction(s, ctx, func(tx *gorm.DB) *gorm.DB {
 		return tx.Where("quota_key = ?", quotaKey).First(&account)
 	})
 	if err != nil {
@@ -324,7 +324,7 @@ func (s *SiaService) AccountExists(ctx context.Context, userID uint) (bool, erro
 		AccountExistsTotal.WithLabelValues(LabelStatusError),
 		func() (bool, error) {
 			var count int64
-			err := db.RetryableComponentLock(s, func(tx *gorm.DB) *gorm.DB {
+			err := db.RetryableComponentTransaction(s, ctx, func(tx *gorm.DB) *gorm.DB {
 				return tx.Model(&siaDB.SiaAccount{}).Where("user_id = ?", userID).Count(&count)
 			})
 			return count > 0, err
@@ -399,7 +399,7 @@ func (s *SiaService) GetFundingCursor(ctx context.Context) (*siaDB.FundingCursor
 		GetFundingCursorTotal.WithLabelValues(LabelStatusError),
 		func() (*siaDB.FundingCursor, error) {
 			var cursor siaDB.FundingCursor
-			err := db.RetryableComponentLock(s, func(tx *gorm.DB) *gorm.DB {
+			err := db.RetryableComponentTransaction(s, ctx, func(tx *gorm.DB) *gorm.DB {
 				return tx.Where("id = ?", 1).First(&cursor)
 			})
 			if err != nil {
@@ -434,7 +434,7 @@ func (s *SiaService) ListProvisionedAccounts(ctx context.Context) ([]siaDB.SiaAc
 		ListProvisionedAccountsTotal.WithLabelValues(LabelStatusError),
 		func() ([]siaDB.SiaAccount, error) {
 			var accounts []siaDB.SiaAccount
-			err := db.RetryableComponentLock(s, func(tx *gorm.DB) *gorm.DB {
+			err := db.RetryableComponentTransaction(s, ctx, func(tx *gorm.DB) *gorm.DB {
 				return tx.Where("quota_key != ?", "").Find(&accounts)
 			})
 			return accounts, err
@@ -530,7 +530,7 @@ func (s *SiaService) ListSlabsByAppAccount(ctx context.Context, siaAppAccountID 
 	defer span.End()
 
 	var slabs []siaDB.SiaSlab
-	err := db.RetryableComponentLock(s, func(tx *gorm.DB) *gorm.DB {
+	err := db.RetryableComponentTransaction(s, ctx, func(tx *gorm.DB) *gorm.DB {
 		return tx.Where("sia_app_account_id = ?", siaAppAccountID).Find(&slabs)
 	})
 	return slabs, err
@@ -636,7 +636,7 @@ func (s *SiaService) FindOrphanedSlabs(ctx context.Context, siaAppAccountID uint
 		Joins("JOIN sia_objects ON sia_objects.id = sia_object_slabs.sia_object_id AND sia_objects.deleted_at IS NULL").
 		Where("sia_object_slabs.deleted_at IS NULL")
 
-	err := db.RetryableComponentLock(s, func(tx *gorm.DB) *gorm.DB {
+	err := db.RetryableComponentTransaction(s, ctx, func(tx *gorm.DB) *gorm.DB {
 		return tx.
 			Where("sia_slabs.sia_app_account_id = ? AND sia_slabs.deleted_at IS NULL", siaAppAccountID).
 			Where("sia_slabs.id NOT IN (?)", subQuery).
@@ -690,7 +690,7 @@ func (s *SiaService) PruneSlabs(ctx context.Context, siaAppAccountID uint) error
 
 		// 3b. Check: does ANY sia_slab record still exist for this slabID (other app accounts)?
 		var stillInUse bool
-		err := db.RetryableComponentLock(s, func(tx *gorm.DB) *gorm.DB {
+		err := db.RetryableComponentTransaction(s, ctx, func(tx *gorm.DB) *gorm.DB {
 			var count int64
 			result := tx.Model(&siaDB.SiaSlab{}).
 				Where("slab_id = ? AND sia_app_account_id != ? AND deleted_at IS NULL", slabID, siaAppAccountID).
