@@ -18,11 +18,11 @@ import (
 	"go.lumeweb.com/portal-plugin-sia/internal/service/sia"
 	"go.lumeweb.com/portal-plugin-sia/internal/testing/mocks"
 	"go.lumeweb.com/portal-plugin-sia/internal/testing/util"
+	"go.lumeweb.com/portal/core"
+	coreTesting "go.lumeweb.com/portal/core/testing"
 	"go.sia.tech/core/types"
 	"go.sia.tech/indexd/accounts"
 	"go.sia.tech/indexd/hosts"
-	"go.lumeweb.com/portal/core"
-	coreTesting "go.lumeweb.com/portal/core/testing"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -229,7 +229,6 @@ func TestSyncFunding_PoolEventAttributed(t *testing.T) {
 		require.NotNil(tb, updatedAccount.LastFundingEventAt)
 	}, opts)
 }
-
 
 func TestProvisionAccount_DatabaseIntegration(t *testing.T) {
 	coreTesting.RunTestCaseWithDB(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
