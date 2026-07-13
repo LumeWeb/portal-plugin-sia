@@ -186,6 +186,33 @@ func (s *SiaService) ListAppAccounts(ctx context.Context, siaAccountID uint) ([]
 	return appAccounts, err
 }
 
+// CountAppAccountsBySiaAccount returns a map of sia_account_id to app count
+// via a single GROUP BY query, avoiding N+1 per-account lookups.
+func (s *SiaService) CountAppAccountsBySiaAccount(ctx context.Context) (map[uint]int, error) {
+	ctx, span := core.TraceMethod(ctx, "SiaService.CountAppAccountsBySiaAccount")
+	defer span.End()
+
+	type countRow struct {
+		SiaAccountID uint
+		Count        int
+	}
+	var rows []countRow
+	err := db.RetryableComponentTransaction(s, ctx, func(tx *gorm.DB) *gorm.DB {
+		return tx.Model(&siaDB.SiaAppAccount{}).
+			Select("sia_account_id, COUNT(*) as count").
+			Group("sia_account_id").
+			Scan(&rows)
+	})
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[uint]int, len(rows))
+	for _, r := range rows {
+		result[r.SiaAccountID] = r.Count
+	}
+	return result, nil
+}
+
 func (s *SiaService) DeleteAppAccountsBySiaAccountID(ctx context.Context, siaAccountID uint) error {
 	ctx, span := core.TraceMethod(ctx, "SiaService.DeleteAppAccountsBySiaAccountID")
 	defer span.End()
