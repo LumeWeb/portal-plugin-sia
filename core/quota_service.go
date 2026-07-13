@@ -20,6 +20,7 @@ type QuotaService interface {
 	ProvisionAccount(ctx context.Context, userID uint) error
 	SyncFunding(ctx context.Context) error
 	EnforceFundingTarget(ctx context.Context, userID uint) error
+	EnforceFundingTargetWithAppCount(ctx context.Context, userID uint, numApps int) error
 
 	// ConnectQuotaCheck performs a predictive quota check for the Connect UI.
 	// It estimates the user's next-interval upload and download usage based on

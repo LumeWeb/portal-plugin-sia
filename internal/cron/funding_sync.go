@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"go.lumeweb.com/portal-plugin-sia/internal"
 	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
+	"go.lumeweb.com/portal-plugin-sia/internal"
 	core "go.lumeweb.com/portal/core"
 	"go.uber.org/zap"
 )
@@ -64,8 +64,23 @@ func (j *SyncFundingJob) Run(ctx core.Context, eventCtx context.Context) error {
 		return err
 	}
 
+	// Batch-fetch app counts to avoid N+1 per-account DB lookups.
+	// On success, absent keys mean 0 apps (enforceFundingTarget defaults to 1).
+	// On failure, pass -1 to trigger per-account ListAppAccounts fallback.
+	appCounts, err := siaSvc.CountAppAccountsBySiaAccount(eventCtx)
+	if err != nil {
+		logger.Warn("failed to batch-fetch app counts, falling back to per-account lookup", zap.Error(err))
+		appCounts = nil
+	}
+
 	for _, account := range accounts {
-		if err := quotaSvc.EnforceFundingTarget(eventCtx, account.UserID); err != nil {
+		var numApps int
+		if appCounts != nil {
+			numApps = appCounts[account.ID] // 0 is valid → defaults to 1 inside
+		} else {
+			numApps = -1 // sentinel: batch unavailable, trigger per-account fallback
+		}
+		if err := quotaSvc.EnforceFundingTargetWithAppCount(eventCtx, account.UserID, numApps); err != nil {
 			logger.Error("failed to enforce funding target", zap.Uint("userID", account.UserID), zap.Error(err))
 			continue
 		}

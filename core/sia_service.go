@@ -21,6 +21,7 @@ type SiaService interface {
 	RegisterAppAccount(ctx context.Context, siaAccountID uint, accountKey types.PublicKey) (*db.SiaAppAccount, error)
 	GetAppAccountByKey(ctx context.Context, accountKey types.PublicKey) (*db.SiaAppAccount, error)
 	ListAppAccounts(ctx context.Context, siaAccountID uint) ([]db.SiaAppAccount, error)
+	CountAppAccountsBySiaAccount(ctx context.Context) (map[uint]int, error)
 	DeleteAppAccountsBySiaAccountID(ctx context.Context, siaAccountID uint) error
 	DeleteAppAccount(ctx context.Context, siaAccountID uint, accountKey types.PublicKey) error
 	AdminClient() AdminClient

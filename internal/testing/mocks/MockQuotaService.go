@@ -276,6 +276,54 @@ func (_c *MockQuotaService_EnforceFundingTarget_Call) RunAndReturn(run func(cont
 	return _c
 }
 
+// EnforceFundingTargetWithAppCount provides a mock function with given fields: ctx, userID, numApps
+func (_m *MockQuotaService) EnforceFundingTargetWithAppCount(ctx context.Context, userID uint, numApps int) error {
+	ret := _m.Called(ctx, userID, numApps)
+
+	if len(ret) == 0 {
+		panic("no return value specified for EnforceFundingTargetWithAppCount")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, uint, int) error); ok {
+		r0 = rf(ctx, userID, numApps)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockQuotaService_EnforceFundingTargetWithAppCount_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EnforceFundingTargetWithAppCount'
+type MockQuotaService_EnforceFundingTargetWithAppCount_Call struct {
+	*mock.Call
+}
+
+// EnforceFundingTargetWithAppCount is a helper method to define mock.On call
+//   - ctx context.Context
+//   - userID uint
+//   - numApps int
+func (_e *MockQuotaService_Expecter) EnforceFundingTargetWithAppCount(ctx interface{}, userID interface{}, numApps interface{}) *MockQuotaService_EnforceFundingTargetWithAppCount_Call {
+	return &MockQuotaService_EnforceFundingTargetWithAppCount_Call{Call: _e.mock.On("EnforceFundingTargetWithAppCount", ctx, userID, numApps)}
+}
+
+func (_c *MockQuotaService_EnforceFundingTargetWithAppCount_Call) Run(run func(ctx context.Context, userID uint, numApps int)) *MockQuotaService_EnforceFundingTargetWithAppCount_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uint), args[2].(int))
+	})
+	return _c
+}
+
+func (_c *MockQuotaService_EnforceFundingTargetWithAppCount_Call) Return(_a0 error) *MockQuotaService_EnforceFundingTargetWithAppCount_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockQuotaService_EnforceFundingTargetWithAppCount_Call) RunAndReturn(run func(context.Context, uint, int) error) *MockQuotaService_EnforceFundingTargetWithAppCount_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ID provides a mock function with no fields
 func (_m *MockQuotaService) ID() string {
 	ret := _m.Called()

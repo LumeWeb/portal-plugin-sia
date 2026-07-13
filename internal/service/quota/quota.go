@@ -126,7 +126,7 @@ func (s *QuotaService) ProvisionAccount(ctx context.Context, userID uint) error 
 				if configManager != nil {
 					limits, err := configManager.ResolveEffectiveLimits(ctx, userID)
 					if err == nil && limits != nil && limits.HasStorageLimitConfig && limits.StorageLimitConfig != nil {
-						fundTargetBytes = internalPkg.CalculateFundTargetBytes(s.activeContractCount.Load())
+						fundTargetBytes = internalPkg.CalculateFundTargetBytes(s.activeContractCount.Load(), 1)
 					}
 				}
 				return nil
@@ -166,6 +166,19 @@ func (s *QuotaService) ProvisionAccount(ctx context.Context, userID uint) error 
 }
 
 func (s *QuotaService) EnforceFundingTarget(ctx context.Context, userID uint) error {
+	// -1 = batch unavailable, trigger per-account ListAppAccounts fallback
+	return s.enforceFundingTarget(ctx, userID, -1)
+}
+
+// EnforceFundingTargetWithAppCount is the same as EnforceFundingTarget but
+// accepts a pre-fetched app count to avoid N+1 DB queries when called in a
+// loop over all accounts. numApps < 0 triggers a per-account ListAppAccounts
+// lookup; numApps == 0 defaults to 1 (batch found no apps).
+func (s *QuotaService) EnforceFundingTargetWithAppCount(ctx context.Context, userID uint, numApps int) error {
+	return s.enforceFundingTarget(ctx, userID, numApps)
+}
+
+func (s *QuotaService) enforceFundingTarget(ctx context.Context, userID uint, appCount int) error {
 	ctx, span := core.TraceMethod(ctx, "QuotaService.EnforceFundingTarget")
 	defer span.End()
 
@@ -229,11 +242,31 @@ func (s *QuotaService) EnforceFundingTarget(ctx context.Context, userID uint) er
 					s.Logger().Debug("enforce funding target: no active contracts, skipping", zap.Uint("userID", userID))
 					return nil
 				}
-				fundTargetBytes = internalPkg.CalculateFundTargetBytes(numContracts)
+
+				// Fetch the user's app count. Each connected app can
+				// independently use the full bandwidth pipe, so the total
+				// predicted bandwidth scales with app count.
+				// appCount < 0 means batch fetch was unavailable; fall back to
+				// per-account ListAppAccounts. appCount == 0 means the batch
+				// fetch succeeded and found 0 apps → default to 1.
+				numApps := uint64(1)
+				if appCount > 0 {
+					numApps = uint64(appCount)
+				} else if appCount < 0 {
+					appAccounts, err := s.siaService.ListAppAccounts(ctx, account.ID)
+					if err != nil {
+						s.Logger().Warn("enforce funding target: failed to fetch app accounts, defaulting numApps=1", zap.Uint("userID", userID), zap.Error(err))
+					} else if len(appAccounts) > 0 {
+						numApps = uint64(len(appAccounts))
+					}
+				}
+
+				fundTargetBytes = internalPkg.CalculateFundTargetBytes(numContracts, numApps)
 				s.Logger().Debug("enforce funding target: calculated fund target",
 					zap.Uint("userID", userID),
 					zap.Uint64("storageLimitBytes", limits.StorageLimitConfig.Bytes),
 					zap.Uint64("numContracts", numContracts),
+					zap.Uint64("numApps", numApps),
 					zap.Uint64("fundTargetBytes", fundTargetBytes),
 					zap.Uint64("accountFundTargetBytes", account.FundTargetBytes),
 				)
@@ -241,7 +274,7 @@ func (s *QuotaService) EnforceFundingTarget(ctx context.Context, userID uint) er
 				// Check storage quota using the same bandwidth-based prediction.
 				// Storage growth is driven by uploads only — a user can't store
 				// more than they can upload in one interval.
-				storageBytes, _ := internalPkg.PredictedBandwidthBytes()
+				storageBytes, _ := internalPkg.PredictedBandwidthBytes(numApps)
 				storageResult, err := quotaPkg.CheckStorageQuota(ctx, s.Context(), userID, storageBytes)
 				if err != nil {
 					s.Logger().Warn("failed to check storage quota", zap.Uint("userID", userID), zap.Error(err))
@@ -258,7 +291,7 @@ func (s *QuotaService) EnforceFundingTarget(ctx context.Context, userID uint) er
 				// This is independent of host/contract count — the pipe is
 				// a hard physical ceiling.
 				if fundTargetBytes > 0 {
-					uploadBytes, downloadBytes := internalPkg.PredictedBandwidthBytes()
+					uploadBytes, downloadBytes := internalPkg.PredictedBandwidthBytes(numApps)
 
 					if uploadBytes > 0 {
 						uploadResult, err := quotaPkg.CheckUploadQuota(ctx, s.Context(), userID, uploadBytes)
@@ -351,15 +384,24 @@ func (s *QuotaService) ConnectQuotaCheck(ctx context.Context, userID uint) (*plu
 		return result, nil
 	}
 
-	// 2. Calculate predicted bytes based on physical bandwidth ceiling.
-	//    Upload uses 3x multiplier (Sia 10-of-30 erasure coding).
-	//    Download uses 1x (only 10 shards needed to reconstruct).
-	//    This is a hard physical ceiling — no user can exceed their pipe
-	//    speed regardless of host or contract count.
-	uploadBytes, downloadBytes := internalPkg.PredictedBandwidthBytes()
+	// 2. Calculate predicted bytes based on physical bandwidth ceiling,
+	//    scaled by the number of connected apps (+1 for the app being
+	//    connected, which is not yet registered). Each app can independently
+	//    use the full pipe. This is a hard physical ceiling — no app can
+	//    exceed its pipe speed regardless of host or contract count.
+	numApps := uint64(1) // default if DB error; = just the connecting app
+	appAccounts, err := s.siaService.ListAppAccounts(ctx, account.ID)
+	if err != nil {
+		s.Logger().Warn("connect quota check: failed to fetch app accounts, defaulting numApps=1", zap.Uint("userID", userID), zap.Error(err))
+	} else {
+		numApps = uint64(len(appAccounts)) + 1
+	}
+
+	uploadBytes, downloadBytes := internalPkg.PredictedBandwidthBytes(numApps)
 
 	s.Logger().Debug("connect quota check: predicted bandwidth bytes",
 		zap.Uint("userID", userID),
+		zap.Uint64("numApps", numApps),
 		zap.Uint64("uploadBytes", uploadBytes),
 		zap.Uint64("downloadBytes", downloadBytes),
 	)
