@@ -202,28 +202,52 @@ func (s *QuotaService) EnforceFundingTarget(ctx context.Context, userID uint) er
 					zap.Uint64("accountFundTargetBytes", account.FundTargetBytes),
 				)
 
-				// Check storage quota
+				// Check storage quota — over-storage users must not receive funding.
 				storageResult, err := quotaPkg.CheckStorageQuota(ctx, s.Context(), userID, 0)
 				if err != nil {
 					s.Logger().Warn("failed to check storage quota", zap.Uint("userID", userID), zap.Error(err))
 				} else if storageResult != nil && !storageResult.Allowed {
+					s.Logger().Warn("enforce funding target: storage quota exceeded",
+						zap.Uint("userID", userID),
+						zap.Uint64("currentUsage", storageResult.Details.CurrentUsage),
+					)
 					overLimit = true
 				}
 
-				// Check upload quota
-				uploadResult, err := quotaPkg.CheckUploadQuota(ctx, s.Context(), userID, 0)
-				if err != nil {
-					s.Logger().Warn("failed to check upload quota", zap.Uint("userID", userID), zap.Error(err))
-				} else if uploadResult != nil && !uploadResult.Allowed {
-					overLimit = true
-				}
+				// Predict the per-interval upload/download bytes indexd will fund.
+				// Download isn't proxied, so we can't track real download usage —
+				// we check what indexd will compute per host per interval.
+				// ConnectQuotaCheck handles the full N-hosts prediction at connect time.
+				if fundTargetBytes > 0 {
+					uploadBytes, downloadBytes := internalPkg.PredictedQuotaBytes(fundTargetBytes)
 
-				// Check download quota
-				downloadResult, err := quotaPkg.CheckDownloadQuota(ctx, s.Context(), userID, 0)
-				if err != nil {
-					s.Logger().Warn("failed to check download quota", zap.Uint("userID", userID), zap.Error(err))
-				} else if downloadResult != nil && !downloadResult.Allowed {
-					overLimit = true
+					if uploadBytes > 0 {
+						uploadResult, err := quotaPkg.CheckUploadQuota(ctx, s.Context(), userID, uploadBytes)
+						if err != nil {
+							s.Logger().Warn("failed to check upload quota", zap.Uint("userID", userID), zap.Uint64("uploadBytes", uploadBytes), zap.Error(err))
+						} else if uploadResult != nil && !uploadResult.Allowed {
+							s.Logger().Warn("enforce funding target: upload quota exceeded",
+								zap.Uint("userID", userID),
+								zap.Uint64("uploadBytes", uploadBytes),
+								zap.Uint64("currentUsage", uploadResult.Details.CurrentUsage),
+							)
+							overLimit = true
+						}
+					}
+
+					if downloadBytes > 0 {
+						downloadResult, err := quotaPkg.CheckDownloadQuota(ctx, s.Context(), userID, downloadBytes)
+						if err != nil {
+							s.Logger().Warn("failed to check download quota", zap.Uint("userID", userID), zap.Uint64("downloadBytes", downloadBytes), zap.Error(err))
+						} else if downloadResult != nil && !downloadResult.Allowed {
+							s.Logger().Warn("enforce funding target: download quota exceeded",
+								zap.Uint("userID", userID),
+								zap.Uint64("downloadBytes", downloadBytes),
+								zap.Uint64("currentUsage", downloadResult.Details.CurrentUsage),
+							)
+							overLimit = true
+						}
+					}
 				}
 
 				return nil
@@ -323,8 +347,7 @@ func (s *QuotaService) ConnectQuotaCheck(ctx context.Context, userID uint) (*plu
 	//    Total across N hosts: FundTargetBytes * N
 	//    The 50/50 split: upload = total/2, download = total/2
 	totalBytes := account.FundTargetBytes * numHosts
-	uploadBytes := totalBytes / 2
-	downloadBytes := totalBytes / 2
+	uploadBytes, downloadBytes := internalPkg.PredictedQuotaBytes(totalBytes)
 
 	s.Logger().Debug("connect quota check: predicted bytes",
 		zap.Uint("userID", userID),
@@ -335,30 +358,49 @@ func (s *QuotaService) ConnectQuotaCheck(ctx context.Context, userID uint) (*plu
 		zap.Uint64("downloadBytes", downloadBytes),
 	)
 
-	// 4. Check quota reserves against predicted usage
-	//    Check upload quota with predicted upload bytes
-	uploadResult, err := quotaPkg.CheckUploadQuota(ctx, s.Context(), userID, uploadBytes)
+	// 4. Check quota reserves against predicted usage.
+	//    Since download isn't proxied, we can't track real download usage.
+	//    We reserve the predicted amount indexd will compute across all hosts.
+	uploadResult, err := quotaPkg.CheckUploadQuota(ctx, s.Context(), userID, uploadBytes, quotaCore.WithCreateReservation())
 	if err != nil {
-		s.Logger().Warn("failed to check upload quota", zap.Uint("userID", userID), zap.Error(err))
+		s.Logger().Warn("failed to check upload quota", zap.Uint("userID", userID), zap.Uint64("uploadBytes", uploadBytes), zap.Error(err))
 	} else if uploadResult != nil && !uploadResult.Allowed {
 		s.Logger().Warn("connect quota check: upload quota exceeded",
 			zap.Uint("userID", userID),
 			zap.Uint64("uploadBytes", uploadBytes),
 		)
+		uploadResult.ReleaseReservation()
 		result.HasQuota = false
+		return result, nil
 	}
 
 	// Check download quota with predicted download bytes
-	downloadResult, err := quotaPkg.CheckDownloadQuota(ctx, s.Context(), userID, downloadBytes)
+	downloadResult, err := quotaPkg.CheckDownloadQuota(ctx, s.Context(), userID, downloadBytes, quotaCore.WithCreateReservation())
 	if err != nil {
 		s.Logger().Warn("failed to check download quota", zap.Uint("userID", userID), zap.Error(err))
+		// Release upload reservation — can't confirm download capacity
+		if uploadResult != nil {
+			uploadResult.ReleaseReservation()
+		}
+		result.HasQuota = false
+		return result, nil
 	} else if downloadResult != nil && !downloadResult.Allowed {
 		s.Logger().Warn("connect quota check: download quota exceeded",
 			zap.Uint("userID", userID),
 			zap.Uint64("downloadBytes", downloadBytes),
 		)
+		downloadResult.ReleaseReservation()
+		// Release upload reservation too — user won't be connecting
+		if uploadResult != nil {
+			uploadResult.ReleaseReservation()
+		}
 		result.HasQuota = false
+		return result, nil
 	}
+
+	// Predictive pre-check only — release reservations since the result does not
+	// carry them back to be consumed by the caller.
+	quotaPkg.ReleaseReservations(uploadResult, downloadResult)
 
 	return result, nil
 }
