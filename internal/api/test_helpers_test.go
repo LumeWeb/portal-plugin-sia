@@ -103,8 +103,7 @@ func (m *mockHelper) SetupQuotaServiceMocks(userID uint) *siaMocks.MockQuotaServ
 
 	mockQuotaService.EXPECT().EnforceFundingTarget(mock.Anything, userID).Return(nil).Maybe()
 	mockQuotaService.EXPECT().ConnectQuotaCheck(mock.Anything, userID).Return(&pluginCore.ConnectQuotaResult{
-		HasQuota:       true,
-		HasUsableHosts: true,
+		HasQuota: true,
 	}, nil).Maybe()
 
 	return mockQuotaService

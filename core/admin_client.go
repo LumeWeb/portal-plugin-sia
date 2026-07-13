@@ -8,6 +8,7 @@ import (
 	"go.sia.tech/indexd/accounts"
 	"go.sia.tech/indexd/api"
 	"go.sia.tech/indexd/api/admin"
+	"go.sia.tech/indexd/contracts"
 	"go.sia.tech/indexd/hosts"
 )
 
@@ -20,6 +21,7 @@ type AdminClient interface {
 	DeleteAccount(ctx context.Context, acc rhp.Account) error
 	FundingEvents(ctx context.Context, cursor accounts.FundingCursor, limit int) ([]accounts.FundingEvent, error)
 	Hosts(ctx context.Context, opts ...admin.HostQueryParameterOption) ([]hosts.Host, error)
+	Contracts(ctx context.Context, opts ...admin.ContractQueryParameterOption) ([]contracts.Contract, error)
 	Account(ctx context.Context, ak types.PublicKey) (accounts.Account, error)
 	Accounts(ctx context.Context, opts ...api.URLQueryParameterOption) ([]accounts.Account, error)
 	PruneSlabs(ctx context.Context, ak types.PublicKey, opts ...api.URLQueryParameterOption) error
