@@ -422,10 +422,10 @@ func TestConnectQuotaCheck_UploadQuotaExceeded(t *testing.T) {
 		require.NoError(tb, err)
 
 		mockQS := core.GetService[*quotaCore.MockQuotaService](ctx, quotaCore.QUOTA_SERVICE)
-		mockQS.EXPECT().CheckUploadQuota(mock.Anything, mock.AnythingOfType("uint"), mock.AnythingOfType("uint64")).Return(quotaCore.QuotaCheckResult{
+		mockQS.EXPECT().CheckUploadQuota(mock.Anything, mock.AnythingOfType("uint"), mock.AnythingOfType("uint64"), mock.Anything).Return(quotaCore.QuotaCheckResult{
 			Allowed: false,
 		}, nil).Maybe()
-		mockQS.EXPECT().CheckDownloadQuota(mock.Anything, mock.AnythingOfType("uint"), mock.AnythingOfType("uint64")).Return(quotaCore.QuotaCheckResult{
+		mockQS.EXPECT().CheckDownloadQuota(mock.Anything, mock.AnythingOfType("uint"), mock.AnythingOfType("uint64"), mock.Anything).Return(quotaCore.QuotaCheckResult{
 			Allowed: true,
 		}, nil).Maybe()
 
@@ -452,10 +452,10 @@ func TestConnectQuotaCheck_DownloadQuotaExceeded(t *testing.T) {
 		require.NoError(tb, err)
 
 		mockQS := core.GetService[*quotaCore.MockQuotaService](ctx, quotaCore.QUOTA_SERVICE)
-		mockQS.EXPECT().CheckUploadQuota(mock.Anything, mock.AnythingOfType("uint"), mock.AnythingOfType("uint64")).Return(quotaCore.QuotaCheckResult{
+		mockQS.EXPECT().CheckUploadQuota(mock.Anything, mock.AnythingOfType("uint"), mock.AnythingOfType("uint64"), mock.Anything).Return(quotaCore.QuotaCheckResult{
 			Allowed: true,
 		}, nil).Maybe()
-		mockQS.EXPECT().CheckDownloadQuota(mock.Anything, mock.AnythingOfType("uint"), mock.AnythingOfType("uint64")).Return(quotaCore.QuotaCheckResult{
+		mockQS.EXPECT().CheckDownloadQuota(mock.Anything, mock.AnythingOfType("uint"), mock.AnythingOfType("uint64"), mock.Anything).Return(quotaCore.QuotaCheckResult{
 			Allowed: false,
 		}, nil).Maybe()
 
