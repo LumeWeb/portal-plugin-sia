@@ -149,12 +149,20 @@ func (s *QuotaService) EnforceFundingTarget(ctx context.Context, userID uint) er
 			account, err := s.siaService.GetAccount(ctx, userID)
 			if err != nil {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
+					s.Logger().Debug("enforce funding target: no sia account found", zap.Uint("userID", userID))
 					return nil
 				}
 				return fmt.Errorf("failed to get sia account: %w", err)
 			}
 
+			s.Logger().Debug("enforce funding target: account state",
+				zap.Uint("userID", userID),
+				zap.Uint64("fundTargetBytes", account.FundTargetBytes),
+				zap.String("quotaKey", account.QuotaKey),
+			)
+
 			if account.QuotaKey == "" {
+				s.Logger().Debug("enforce funding target: QuotaKey empty, skipping", zap.Uint("userID", userID))
 				return nil
 			}
 
@@ -170,17 +178,29 @@ func (s *QuotaService) EnforceFundingTarget(ctx context.Context, userID uint) er
 
 				limits, err := configManager.ResolveEffectiveLimits(ctx, userID)
 				if err != nil || limits == nil {
+					s.Logger().Debug("enforce funding target: no limits resolved",
+						zap.Uint("userID", userID),
+						zap.Bool("limitsNil", limits == nil),
+						zap.Error(err),
+					)
 					return nil
 				}
 
 				// No storage limit means no Sia access
 				if !limits.HasStorageLimitConfig || limits.StorageLimitConfig == nil {
+					s.Logger().Debug("enforce funding target: no storage limit config", zap.Uint("userID", userID))
 					fundTargetBytes = 0
 					overLimit = true
 					return nil
 				}
 
 				fundTargetBytes = internalPkg.CalculateFundTargetBytes(limits.StorageLimitConfig.Bytes)
+				s.Logger().Debug("enforce funding target: calculated fund target",
+					zap.Uint("userID", userID),
+					zap.Uint64("storageLimitBytes", limits.StorageLimitConfig.Bytes),
+					zap.Uint64("fundTargetBytes", fundTargetBytes),
+					zap.Uint64("accountFundTargetBytes", account.FundTargetBytes),
+				)
 
 				// Check storage quota
 				storageResult, err := quotaPkg.CheckStorageQuota(ctx, s.Context(), userID, 0)
@@ -210,11 +230,16 @@ func (s *QuotaService) EnforceFundingTarget(ctx context.Context, userID uint) er
 			})
 
 			if overLimit {
+				s.Logger().Debug("enforce funding target: over limit, setting fundTargetBytes to 0", zap.Uint("userID", userID))
 				fundTargetBytes = 0
 			}
 
 			// Skip update if unchanged
 			if fundTargetBytes == account.FundTargetBytes {
+				s.Logger().Debug("enforce funding target: skipping update, unchanged",
+					zap.Uint("userID", userID),
+					zap.Uint64("fundTargetBytes", fundTargetBytes),
+				)
 				return nil
 			}
 
@@ -243,11 +268,23 @@ func (s *QuotaService) ConnectQuotaCheck(ctx context.Context, userID uint) (*plu
 	// 1. Get the user's Sia account from DB
 	account, err := s.siaService.GetAccount(ctx, userID)
 	if err != nil {
+		s.Logger().Error("connect quota check: failed to get sia account", zap.Uint("userID", userID), zap.Error(err))
 		return nil, fmt.Errorf("failed to get sia account: %w", err)
 	}
 
+	s.Logger().Debug("connect quota check: account state",
+		zap.Uint("userID", userID),
+		zap.Uint64("fundTargetBytes", account.FundTargetBytes),
+		zap.String("quotaKey", account.QuotaKey),
+		zap.String("connectKey", account.ConnectKey),
+	)
+
 	// If FundTargetBytes is 0, the user has no storage quota plan
 	if account.FundTargetBytes == 0 {
+		s.Logger().Warn("connect quota check: blocking - FundTargetBytes is 0",
+			zap.Uint("userID", userID),
+			zap.String("quotaKey", account.QuotaKey),
+		)
 		result.HasQuota = false
 		result.HasUsableHosts = true // not checked, but quota error should take priority
 		return result, nil
@@ -270,7 +307,12 @@ func (s *QuotaService) ConnectQuotaCheck(ctx context.Context, userID uint) (*plu
 	}
 
 	numHosts := uint64(len(usableHosts))
+	s.Logger().Debug("connect quota check: usable hosts",
+		zap.Uint("userID", userID),
+		zap.Uint64("numHosts", numHosts),
+	)
 	if numHosts == 0 {
+		s.Logger().Warn("connect quota check: blocking - no usable hosts", zap.Uint("userID", userID))
 		result.HasUsableHosts = false
 		result.HasQuota = false
 		return result, nil
@@ -284,12 +326,25 @@ func (s *QuotaService) ConnectQuotaCheck(ctx context.Context, userID uint) (*plu
 	uploadBytes := totalBytes / 2
 	downloadBytes := totalBytes / 2
 
+	s.Logger().Debug("connect quota check: predicted bytes",
+		zap.Uint("userID", userID),
+		zap.Uint64("fundTargetBytes", account.FundTargetBytes),
+		zap.Uint64("numHosts", numHosts),
+		zap.Uint64("totalBytes", totalBytes),
+		zap.Uint64("uploadBytes", uploadBytes),
+		zap.Uint64("downloadBytes", downloadBytes),
+	)
+
 	// 4. Check quota reserves against predicted usage
 	//    Check upload quota with predicted upload bytes
 	uploadResult, err := quotaPkg.CheckUploadQuota(ctx, s.Context(), userID, uploadBytes)
 	if err != nil {
 		s.Logger().Warn("failed to check upload quota", zap.Uint("userID", userID), zap.Error(err))
 	} else if uploadResult != nil && !uploadResult.Allowed {
+		s.Logger().Warn("connect quota check: upload quota exceeded",
+			zap.Uint("userID", userID),
+			zap.Uint64("uploadBytes", uploadBytes),
+		)
 		result.HasQuota = false
 	}
 
@@ -298,6 +353,10 @@ func (s *QuotaService) ConnectQuotaCheck(ctx context.Context, userID uint) (*plu
 	if err != nil {
 		s.Logger().Warn("failed to check download quota", zap.Uint("userID", userID), zap.Error(err))
 	} else if downloadResult != nil && !downloadResult.Allowed {
+		s.Logger().Warn("connect quota check: download quota exceeded",
+			zap.Uint("userID", userID),
+			zap.Uint64("downloadBytes", downloadBytes),
+		)
 		result.HasQuota = false
 	}
 

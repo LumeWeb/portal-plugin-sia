@@ -241,11 +241,18 @@ func (a *API) HandleGETAuthConnect(c echo.Context) error {
 	if err != nil {
 		a.Logger().Error("failed to check connect quota", zap.Uint("userID", userID), zap.Error(err))
 	} else if quotaResult != nil {
+		a.Logger().Debug("connect quota check result",
+			zap.Uint("userID", userID),
+			zap.Bool("hasQuota", quotaResult.HasQuota),
+			zap.Bool("hasUsableHosts", quotaResult.HasUsableHosts),
+		)
 		if !quotaResult.HasUsableHosts {
+			a.Logger().Warn("connect blocked: no usable hosts", zap.Uint("userID", userID))
 			c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
 			return systemErrorTemplate.ExecuteTemplate(c.Response().Writer, "system-error", layoutData{})
 		}
 		if !quotaResult.HasQuota {
+			a.Logger().Warn("connect blocked: storage quota exceeded", zap.Uint("userID", userID))
 			subscriptionURL := a.resolveSubscriptionURL()
 			c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
 			return quotaErrorTemplate.ExecuteTemplate(c.Response().Writer, "quota-error", layoutData{
