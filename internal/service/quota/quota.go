@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"sync/atomic"
+	"time"
 
 	quotaCore "go.lumeweb.com/portal-plugin-quota/core"
 	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
@@ -56,7 +57,31 @@ func (s *QuotaService) ID() string {
 }
 
 func (s *QuotaService) Start() error {
+	ctx, cancel := context.WithTimeout(s.Context(), 5*time.Second)
+	defer cancel()
+
+	// Pre-warm the active contract count so EnforceFundingTarget and
+	// ConnectQuotaCheck have a non-zero value before the first cron tick.
+	s.refreshActiveContractCount(ctx)
+
 	return nil
+}
+
+// refreshActiveContractCount fetches the active (revisable) contract count
+// from the indexd admin API and caches it in activeContractCount. Called
+// on boot and once per sync tick by SyncFunding.
+func (s *QuotaService) refreshActiveContractCount(ctx context.Context) {
+	if s.siaService.AdminClient() == nil {
+		return
+	}
+
+	activeContracts, err := s.siaService.AdminClient().Contracts(ctx, admin.WithRevisable(true))
+	if err != nil {
+		s.Logger().Warn("failed to fetch active contracts", zap.Error(err))
+		return
+	}
+
+	s.activeContractCount.Store(uint64(len(activeContracts)))
 }
 
 func (s *QuotaService) ProvisionAccount(ctx context.Context, userID uint) error {
@@ -213,8 +238,11 @@ func (s *QuotaService) EnforceFundingTarget(ctx context.Context, userID uint) er
 					zap.Uint64("accountFundTargetBytes", account.FundTargetBytes),
 				)
 
-				// Check storage quota — over-storage users must not receive funding.
-				storageResult, err := quotaPkg.CheckStorageQuota(ctx, s.Context(), userID, 0)
+				// Check storage quota using the same bandwidth-based prediction.
+				// Storage growth is driven by uploads only — a user can't store
+				// more than they can upload in one interval.
+				storageBytes, _ := internalPkg.PredictedBandwidthBytes()
+				storageResult, err := quotaPkg.CheckStorageQuota(ctx, s.Context(), userID, storageBytes)
 				if err != nil {
 					s.Logger().Warn("failed to check storage quota", zap.Uint("userID", userID), zap.Error(err))
 				} else if storageResult != nil && !storageResult.Allowed {
@@ -391,15 +419,8 @@ func (s *QuotaService) SyncFunding(ctx context.Context) error {
 				return nil
 			}
 
-			// Fetch and cache the active contract count once per sync tick.
-			// EnforceFundingTarget uses this cached value instead of fetching
-			// contracts per-user.
-			activeContracts, err := s.siaService.AdminClient().Contracts(ctx, admin.WithRevisable(true))
-			if err != nil {
-				s.Logger().Warn("sync funding: failed to fetch active contracts", zap.Error(err))
-			} else {
-				s.activeContractCount.Store(uint64(len(activeContracts)))
-			}
+			// Refresh the cached active contract count once per sync tick.
+			s.refreshActiveContractCount(ctx)
 
 			// 1. Read global cursor from our DB (single row, single table lookup)
 			cursor, err := s.siaService.GetFundingCursor(ctx)
