@@ -2,7 +2,6 @@ package quota
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
 
@@ -22,7 +21,7 @@ import (
 	coreTesting "go.lumeweb.com/portal/core/testing"
 	"go.sia.tech/core/types"
 	"go.sia.tech/indexd/accounts"
-	"go.sia.tech/indexd/hosts"
+	"go.sia.tech/indexd/contracts"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -193,6 +192,7 @@ func TestSyncFunding_PoolEventAttributed(t *testing.T) {
 
 	mockAdmin.EXPECT().FundingEvents(mock.Anything, mock.Anything, mock.Anything).Return([]accounts.FundingEvent{poolEvent}, nil).Once()
 	mockAdmin.EXPECT().FundingEvents(mock.Anything, mock.Anything, mock.Anything).Return([]accounts.FundingEvent{}, nil).Maybe()
+	mockAdmin.EXPECT().Contracts(mock.Anything, mock.Anything).Return([]contracts.Contract{{}}, nil).Maybe()
 
 	coreTesting.RunTestCaseWithDB(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
 		// Ensure a funding cursor row exists
@@ -273,7 +273,7 @@ func TestEnforceFundingTarget_AppliesCalculateFundTargetBytes(t *testing.T) {
 	userID := uint(200)
 	quotaKey := "user-200"
 	storageLimitBytes := uint64(120 * 1 << 30) // 120 GiB
-	expectedFundTargetBytes := internal.CalculateFundTargetBytes(storageLimitBytes)
+	expectedFundTargetBytes := internal.CalculateFundTargetBytes(1)
 
 	// mock config manager returns limits with a known storage config
 	mockCM := &mockConfigManager{}
@@ -309,6 +309,8 @@ func TestEnforceFundingTarget_AppliesCalculateFundTargetBytes(t *testing.T) {
 		assert.NoError(tb, err)
 
 		quotaSvc := core.GetService[pluginCore.QuotaService](ctx, pluginCore.QUOTA_SERVICE)
+		// Simulate SyncFunding having cached 1 active contract
+		quotaSvc.(*QuotaService).activeContractCount.Store(1)
 		err = quotaSvc.EnforceFundingTarget(context.Background(), userID)
 		assert.NoError(tb, err)
 	}, opts)
@@ -341,76 +343,11 @@ func TestConnectQuotaCheck_FundTargetBytesZero(t *testing.T) {
 
 		require.NoError(tb, err)
 		assert.False(tb, result.HasQuota)
-		assert.True(tb, result.HasUsableHosts) // quota error takes priority over unchecked hosts
 	}, QuotaTestOptions())
-}
-
-func TestConnectQuotaCheck_AdminClientNil(t *testing.T) {
-	coreTesting.RunTestCaseWithDB(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
-		account := &siaDB.SiaAccount{
-			UserID:          1,
-			ConnectKey:      "test-key-adminnil",
-			FundTargetBytes: 1 << 30, // 1 GiB
-		}
-		err := ctx.DB().Create(account).Error
-		require.NoError(tb, err)
-
-		quotaSvc := core.GetService[pluginCore.QuotaService](ctx, pluginCore.QUOTA_SERVICE)
-		result, err := quotaSvc.ConnectQuotaCheck(context.Background(), 1)
-
-		require.NoError(tb, err)
-		assert.True(tb, result.HasQuota)
-		assert.True(tb, result.HasUsableHosts)
-	}, QuotaTestOptions())
-}
-
-func TestConnectQuotaCheck_HostsError(t *testing.T) {
-	opts, mockAdmin := quotaTestOptionsWithMockAdmin(t)
-	mockAdmin.EXPECT().Hosts(mock.Anything, mock.Anything).Return(nil, errors.New("host service unavailable")).Maybe()
-
-	coreTesting.RunTestCaseWithDB(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
-		account := &siaDB.SiaAccount{
-			UserID:          1,
-			ConnectKey:      "test-key-hostserr",
-			FundTargetBytes: 1 << 30,
-		}
-		err := ctx.DB().Create(account).Error
-		require.NoError(tb, err)
-
-		quotaSvc := core.GetService[pluginCore.QuotaService](ctx, pluginCore.QUOTA_SERVICE)
-		result, err := quotaSvc.ConnectQuotaCheck(context.Background(), 1)
-
-		require.NoError(tb, err)
-		assert.True(tb, result.HasQuota)
-		assert.True(tb, result.HasUsableHosts)
-	}, opts)
-}
-
-func TestConnectQuotaCheck_NoUsableHosts(t *testing.T) {
-	opts, mockAdmin := quotaTestOptionsWithMockAdmin(t)
-	mockAdmin.EXPECT().Hosts(mock.Anything, mock.Anything).Return([]hosts.Host{}, nil).Maybe()
-
-	coreTesting.RunTestCaseWithDB(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
-		account := &siaDB.SiaAccount{
-			UserID:          1,
-			ConnectKey:      "test-key-nohosts",
-			FundTargetBytes: 1 << 30,
-		}
-		err := ctx.DB().Create(account).Error
-		require.NoError(tb, err)
-
-		quotaSvc := core.GetService[pluginCore.QuotaService](ctx, pluginCore.QUOTA_SERVICE)
-		result, err := quotaSvc.ConnectQuotaCheck(context.Background(), 1)
-
-		require.NoError(tb, err)
-		assert.False(tb, result.HasQuota)
-		assert.False(tb, result.HasUsableHosts)
-	}, opts)
 }
 
 func TestConnectQuotaCheck_UploadQuotaExceeded(t *testing.T) {
-	opts, mockAdmin := quotaTestOptionsWithMockAdminAndQuotaCore(t)
-	mockAdmin.EXPECT().Hosts(mock.Anything, mock.Anything).Return([]hosts.Host{{}}, nil).Maybe()
+	opts, _ := quotaTestOptionsWithMockAdminAndQuotaCore(t)
 
 	coreTesting.RunTestCaseWithDB(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
 		account := &siaDB.SiaAccount{
@@ -434,13 +371,11 @@ func TestConnectQuotaCheck_UploadQuotaExceeded(t *testing.T) {
 
 		require.NoError(tb, err)
 		assert.False(tb, result.HasQuota)
-		assert.True(tb, result.HasUsableHosts)
 	}, opts)
 }
 
 func TestConnectQuotaCheck_DownloadQuotaExceeded(t *testing.T) {
-	opts, mockAdmin := quotaTestOptionsWithMockAdminAndQuotaCore(t)
-	mockAdmin.EXPECT().Hosts(mock.Anything, mock.Anything).Return([]hosts.Host{{}}, nil).Maybe()
+	opts, _ := quotaTestOptionsWithMockAdminAndQuotaCore(t)
 
 	coreTesting.RunTestCaseWithDB(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
 		account := &siaDB.SiaAccount{
@@ -464,13 +399,11 @@ func TestConnectQuotaCheck_DownloadQuotaExceeded(t *testing.T) {
 
 		require.NoError(tb, err)
 		assert.False(tb, result.HasQuota)
-		assert.True(tb, result.HasUsableHosts)
 	}, opts)
 }
 
 func TestConnectQuotaCheck_Success(t *testing.T) {
-	opts, mockAdmin := quotaTestOptionsWithMockAdmin(t)
-	mockAdmin.EXPECT().Hosts(mock.Anything, mock.Anything).Return([]hosts.Host{{}}, nil).Maybe()
+	opts, _ := quotaTestOptionsWithMockAdmin(t)
 
 	coreTesting.RunTestCaseWithDB(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
 		account := &siaDB.SiaAccount{
@@ -486,6 +419,5 @@ func TestConnectQuotaCheck_Success(t *testing.T) {
 
 		require.NoError(tb, err)
 		assert.True(tb, result.HasQuota)
-		assert.True(tb, result.HasUsableHosts)
 	}, opts)
 }

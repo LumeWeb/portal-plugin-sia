@@ -10,6 +10,8 @@ import (
 
 	context "context"
 
+	contracts "go.sia.tech/indexd/contracts"
+
 	hosts "go.sia.tech/indexd/hosts"
 
 	mock "github.com/stretchr/testify/mock"
@@ -215,6 +217,79 @@ func (_c *MockAdminClient_AddAppConnectKey_Call) Return(_a0 accounts.ConnectKey,
 }
 
 func (_c *MockAdminClient_AddAppConnectKey_Call) RunAndReturn(run func(context.Context, accounts.AppConnectKeyRequest) (accounts.ConnectKey, error)) *MockAdminClient_AddAppConnectKey_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// Contracts provides a mock function with given fields: ctx, opts
+func (_m *MockAdminClient) Contracts(ctx context.Context, opts ...admin.ContractQueryParameterOption) ([]contracts.Contract, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	if len(ret) == 0 {
+		panic("no return value specified for Contracts")
+	}
+
+	var r0 []contracts.Contract
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, ...admin.ContractQueryParameterOption) ([]contracts.Contract, error)); ok {
+		return rf(ctx, opts...)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, ...admin.ContractQueryParameterOption) []contracts.Contract); ok {
+		r0 = rf(ctx, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]contracts.Contract)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, ...admin.ContractQueryParameterOption) error); ok {
+		r1 = rf(ctx, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockAdminClient_Contracts_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Contracts'
+type MockAdminClient_Contracts_Call struct {
+	*mock.Call
+}
+
+// Contracts is a helper method to define mock.On call
+//   - ctx context.Context
+//   - opts ...admin.ContractQueryParameterOption
+func (_e *MockAdminClient_Expecter) Contracts(ctx interface{}, opts ...interface{}) *MockAdminClient_Contracts_Call {
+	return &MockAdminClient_Contracts_Call{Call: _e.mock.On("Contracts",
+		append([]interface{}{ctx}, opts...)...)}
+}
+
+func (_c *MockAdminClient_Contracts_Call) Run(run func(ctx context.Context, opts ...admin.ContractQueryParameterOption)) *MockAdminClient_Contracts_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		variadicArgs := make([]admin.ContractQueryParameterOption, len(args)-1)
+		for i, a := range args[1:] {
+			if a != nil {
+				variadicArgs[i] = a.(admin.ContractQueryParameterOption)
+			}
+		}
+		run(args[0].(context.Context), variadicArgs...)
+	})
+	return _c
+}
+
+func (_c *MockAdminClient_Contracts_Call) Return(_a0 []contracts.Contract, _a1 error) *MockAdminClient_Contracts_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockAdminClient_Contracts_Call) RunAndReturn(run func(context.Context, ...admin.ContractQueryParameterOption) ([]contracts.Contract, error)) *MockAdminClient_Contracts_Call {
 	_c.Call.Return(run)
 	return _c
 }

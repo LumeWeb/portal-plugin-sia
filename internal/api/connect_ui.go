@@ -244,13 +244,7 @@ func (a *API) HandleGETAuthConnect(c echo.Context) error {
 		a.Logger().Debug("connect quota check result",
 			zap.Uint("userID", userID),
 			zap.Bool("hasQuota", quotaResult.HasQuota),
-			zap.Bool("hasUsableHosts", quotaResult.HasUsableHosts),
 		)
-		if !quotaResult.HasUsableHosts {
-			a.Logger().Warn("connect blocked: no usable hosts", zap.Uint("userID", userID))
-			c.Response().Header().Set("Content-Type", "text/html; charset=utf-8")
-			return systemErrorTemplate.ExecuteTemplate(c.Response().Writer, "system-error", layoutData{})
-		}
 		if !quotaResult.HasQuota {
 			a.Logger().Warn("connect blocked: storage quota exceeded", zap.Uint("userID", userID))
 			subscriptionURL := a.resolveSubscriptionURL()

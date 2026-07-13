@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sync/atomic"
 
 	quotaCore "go.lumeweb.com/portal-plugin-quota/core"
 	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
@@ -27,7 +28,8 @@ var ErrAccountNotVerified = errors.New("user account not verified")
 
 type QuotaService struct {
 	*core.BaseComponent
-	siaService pluginCore.SiaService
+	siaService          pluginCore.SiaService
+	activeContractCount atomic.Uint64
 }
 
 func NewQuotaService() (core.Service, []core.ContextBuilderOption, error) {
@@ -99,7 +101,7 @@ func (s *QuotaService) ProvisionAccount(ctx context.Context, userID uint) error 
 				if configManager != nil {
 					limits, err := configManager.ResolveEffectiveLimits(ctx, userID)
 					if err == nil && limits != nil && limits.HasStorageLimitConfig && limits.StorageLimitConfig != nil {
-						fundTargetBytes = internalPkg.CalculateFundTargetBytes(limits.StorageLimitConfig.Bytes)
+						fundTargetBytes = internalPkg.CalculateFundTargetBytes(s.activeContractCount.Load())
 					}
 				}
 				return nil
@@ -194,10 +196,19 @@ func (s *QuotaService) EnforceFundingTarget(ctx context.Context, userID uint) er
 					return nil
 				}
 
-				fundTargetBytes = internalPkg.CalculateFundTargetBytes(limits.StorageLimitConfig.Bytes)
+				// Use the cached active contract count (updated once per sync
+				// tick by SyncFunding). Each contract's account gets its
+				// proportional share of the per-interval bandwidth budget.
+				numContracts := s.activeContractCount.Load()
+				if numContracts == 0 {
+					s.Logger().Debug("enforce funding target: no active contracts, skipping", zap.Uint("userID", userID))
+					return nil
+				}
+				fundTargetBytes = internalPkg.CalculateFundTargetBytes(numContracts)
 				s.Logger().Debug("enforce funding target: calculated fund target",
 					zap.Uint("userID", userID),
 					zap.Uint64("storageLimitBytes", limits.StorageLimitConfig.Bytes),
+					zap.Uint64("numContracts", numContracts),
 					zap.Uint64("fundTargetBytes", fundTargetBytes),
 					zap.Uint64("accountFundTargetBytes", account.FundTargetBytes),
 				)
@@ -214,12 +225,12 @@ func (s *QuotaService) EnforceFundingTarget(ctx context.Context, userID uint) er
 					overLimit = true
 				}
 
-				// Predict the per-interval upload/download bytes indexd will fund.
-				// Download isn't proxied, so we can't track real download usage —
-				// we check what indexd will compute per host per interval.
-				// ConnectQuotaCheck handles the full N-hosts prediction at connect time.
+				// Predict the per-interval upload/download bytes based on
+				// physical bandwidth ceiling and Sia erasure coding overhead.
+				// This is independent of host/contract count — the pipe is
+				// a hard physical ceiling.
 				if fundTargetBytes > 0 {
-					uploadBytes, downloadBytes := internalPkg.PredictedQuotaBytes(fundTargetBytes)
+					uploadBytes, downloadBytes := internalPkg.PredictedBandwidthBytes()
 
 					if uploadBytes > 0 {
 						uploadResult, err := quotaPkg.CheckUploadQuota(ctx, s.Context(), userID, uploadBytes)
@@ -285,8 +296,7 @@ func (s *QuotaService) Stop() error {
 
 func (s *QuotaService) ConnectQuotaCheck(ctx context.Context, userID uint) (*pluginCore.ConnectQuotaResult, error) {
 	result := &pluginCore.ConnectQuotaResult{
-		HasQuota:       true,  // assume good until proven otherwise
-		HasUsableHosts: false, // assume bad until proven otherwise
+		HasQuota: true, // assume good until proven otherwise
 	}
 
 	// 1. Get the user's Sia account from DB
@@ -310,57 +320,23 @@ func (s *QuotaService) ConnectQuotaCheck(ctx context.Context, userID uint) (*plu
 			zap.String("quotaKey", account.QuotaKey),
 		)
 		result.HasQuota = false
-		result.HasUsableHosts = true // not checked, but quota error should take priority
 		return result, nil
 	}
 
-	// 2. Get usable hosts from indexd admin API
-	adminClient := s.siaService.AdminClient()
-	if adminClient == nil {
-		// Admin client not configured - can't check hosts, assume OK
-		result.HasUsableHosts = true
-		return result, nil
-	}
+	// 2. Calculate predicted bytes based on physical bandwidth ceiling.
+	//    Upload uses 3x multiplier (Sia 10-of-30 erasure coding).
+	//    Download uses 1x (only 10 shards needed to reconstruct).
+	//    This is a hard physical ceiling — no user can exceed their pipe
+	//    speed regardless of host or contract count.
+	uploadBytes, downloadBytes := internalPkg.PredictedBandwidthBytes()
 
-	usableHosts, err := adminClient.Hosts(ctx, admin.WithUsable(true))
-	if err != nil {
-		s.Logger().Warn("failed to get usable hosts for quota check", zap.Uint("userID", userID), zap.Error(err))
-		// Can't determine host status - assume OK to avoid blocking Connect UI on transient errors
-		result.HasUsableHosts = true
-		return result, nil
-	}
-
-	numHosts := uint64(len(usableHosts))
-	s.Logger().Debug("connect quota check: usable hosts",
+	s.Logger().Debug("connect quota check: predicted bandwidth bytes",
 		zap.Uint("userID", userID),
-		zap.Uint64("numHosts", numHosts),
-	)
-	if numHosts == 0 {
-		s.Logger().Warn("connect quota check: blocking - no usable hosts", zap.Uint("userID", userID))
-		result.HasUsableHosts = false
-		result.HasQuota = false
-		return result, nil
-	}
-	result.HasUsableHosts = true
-
-	// 3. Calculate predicted bytes: FundTargetBytes is the per-host per-interval budget.
-	//    Total across N hosts: FundTargetBytes * N
-	//    The 50/50 split: upload = total/2, download = total/2
-	totalBytes := account.FundTargetBytes * numHosts
-	uploadBytes, downloadBytes := internalPkg.PredictedQuotaBytes(totalBytes)
-
-	s.Logger().Debug("connect quota check: predicted bytes",
-		zap.Uint("userID", userID),
-		zap.Uint64("fundTargetBytes", account.FundTargetBytes),
-		zap.Uint64("numHosts", numHosts),
-		zap.Uint64("totalBytes", totalBytes),
 		zap.Uint64("uploadBytes", uploadBytes),
 		zap.Uint64("downloadBytes", downloadBytes),
 	)
 
-	// 4. Check quota reserves against predicted usage.
-	//    Since download isn't proxied, we can't track real download usage.
-	//    We reserve the predicted amount indexd will compute across all hosts.
+	// 3. Check quota reserves against predicted usage.
 	uploadResult, err := quotaPkg.CheckUploadQuota(ctx, s.Context(), userID, uploadBytes, quotaCore.WithCreateReservation())
 	if err != nil {
 		s.Logger().Warn("failed to check upload quota", zap.Uint("userID", userID), zap.Uint64("uploadBytes", uploadBytes), zap.Error(err))
@@ -378,7 +354,6 @@ func (s *QuotaService) ConnectQuotaCheck(ctx context.Context, userID uint) (*plu
 	downloadResult, err := quotaPkg.CheckDownloadQuota(ctx, s.Context(), userID, downloadBytes, quotaCore.WithCreateReservation())
 	if err != nil {
 		s.Logger().Warn("failed to check download quota", zap.Uint("userID", userID), zap.Error(err))
-		// Release upload reservation — can't confirm download capacity
 		if uploadResult != nil {
 			uploadResult.ReleaseReservation()
 		}
@@ -390,7 +365,6 @@ func (s *QuotaService) ConnectQuotaCheck(ctx context.Context, userID uint) (*plu
 			zap.Uint64("downloadBytes", downloadBytes),
 		)
 		downloadResult.ReleaseReservation()
-		// Release upload reservation too — user won't be connecting
 		if uploadResult != nil {
 			uploadResult.ReleaseReservation()
 		}
@@ -415,6 +389,16 @@ func (s *QuotaService) SyncFunding(ctx context.Context) error {
 		func() error {
 			if s.siaService.AdminClient() == nil {
 				return nil
+			}
+
+			// Fetch and cache the active contract count once per sync tick.
+			// EnforceFundingTarget uses this cached value instead of fetching
+			// contracts per-user.
+			activeContracts, err := s.siaService.AdminClient().Contracts(ctx, admin.WithRevisable(true))
+			if err != nil {
+				s.Logger().Warn("sync funding: failed to fetch active contracts", zap.Error(err))
+			} else {
+				s.activeContractCount.Store(uint64(len(activeContracts)))
 			}
 
 			// 1. Read global cursor from our DB (single row, single table lookup)
