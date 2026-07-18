@@ -232,7 +232,13 @@ func (a *API) HandleGETAuthConnect(c echo.Context) error {
 			a.Logger().Error("failed to parse dashboard URL", zap.Error(err))
 			return echo.NewHTTPError(http.StatusInternalServerError, "internal error")
 		}
-		dest.RawQuery = url.Values{"to": {a.resolvePublicURL() + c.Request().URL.String()}}.Encode()
+		dest.Path = "/app-login"
+		query := url.Values{}
+		query.Set("to", a.resolvePublicURL()+c.Request().URL.String())
+		if data.AppName != "" {
+			query.Set("app", data.AppName)
+		}
+		dest.RawQuery = query.Encode()
 
 		return c.Redirect(http.StatusFound, dest.String())
 	}
