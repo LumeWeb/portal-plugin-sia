@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -24,6 +25,7 @@ import (
 	"go.sia.tech/indexd/api"
 	"go.sia.tech/indexd/api/admin"
 	"go.uber.org/zap"
+	xsync "golang.org/x/sync/singleflight"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -912,4 +914,114 @@ func (s *SiaService) PruneAccount(ctx context.Context, userID uint) error {
 	}
 
 	return nil
+}
+
+// statsCacheTTL is how long cached StorageStats results are served before
+// a fresh aggregate query runs. Stats don't need to be real-time — they're
+// aggregate counts used for public/anonymized reporting.
+const statsCacheTTL = 1 * time.Minute
+
+type cachedStats struct {
+	value     *core.ProtocolStorageStats
+	expiresAt time.Time
+}
+
+var (
+	statsCache atomic.Pointer[cachedStats]
+	statsGroup xsync.Group
+)
+
+// StorageStats returns protocol-specific storage statistics for the Sia protocol.
+// Results are cached for statsCacheTTL to avoid unbounded aggregate scans on
+// every request. Concurrent callers after TTL expiry are coalesced via
+// singleflight so only one goroutine runs the queries while the rest wait.
+//
+// The aggregate query runs COUNT(DISTINCT id), SUM(size), and
+// SUM(json_extract(metadata, '$.redundancy.totalSize')) across uploads filtered
+// by protocol + mime_type, plus a full count of sia_slabs.
+//
+// json_extract is valid on both supported databases: SQLite (JSON1 extension,
+// built-in since 3.9) and MySQL 5.7+. The portal does not support PostgreSQL.
+func (s *SiaService) StorageStats(ctx context.Context) (*core.ProtocolStorageStats, error) {
+	ctx, span := core.TraceMethod(ctx, "SiaService.StorageStats")
+	defer span.End()
+
+	// Serve from cache if still valid. Return a copy to prevent callers
+	// from mutating the cached value.
+	if cached := statsCache.Load(); cached != nil && time.Now().Before(cached.expiresAt) {
+		copied := *cached.value
+		return &copied, nil
+	}
+
+	// Coalesce concurrent refreshes so only one goroutine runs the queries.
+	v, err, _ := statsGroup.Do("storage_stats", func() (interface{}, error) {
+		// Double-check after acquiring singleflight — another goroutine may
+		// have already refreshed the cache.
+		if cached := statsCache.Load(); cached != nil && time.Now().Before(cached.expiresAt) {
+			return cached.value, nil
+		}
+
+		return s.queryStorageStats(ctx)
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	// Return a copy to prevent callers from mutating the cached value.
+	result := v.(*core.ProtocolStorageStats)
+	copied := *result
+	return &copied, nil
+}
+
+// queryStorageStats runs the actual aggregate queries and caches the result.
+func (s *SiaService) queryStorageStats(ctx context.Context) (*core.ProtocolStorageStats, error) {
+	// Query slab upload counts, data sizes, and redundancy-scaled sizes
+	// in a single SQL query using json_extract to pull TotalSize from
+	// the metadata JSON column.
+	//
+	// Upload.Metadata stores: {"redundancy": {"minShards":N, "totalSectors":N, "dataSize":N, "totalSize":N}}
+	// Upload.Size is DataSize (before redundancy); TotalSize includes redundancy.
+	var slabStats struct {
+		ObjectCount          uint64
+		StorageBytes         uint64
+		PhysicalStorageBytes uint64
+	}
+	err := db.RetryableComponentTransaction(s, ctx, func(tx *gorm.DB) *gorm.DB {
+		return tx.Table("uploads").
+			Select(`COUNT(DISTINCT id) as object_count,
+				COALESCE(SUM(size), 0) as storage_bytes,
+				COALESCE(SUM(json_extract(metadata, '$.redundancy.totalSize')), 0) as physical_storage_bytes`).
+			Where("protocol = ? AND mime_type = ? AND deleted_at IS NULL",
+				internal.ProtocolName, pluginCore.MimeTypeSiaSlab).
+			Scan(&slabStats)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to query slab upload stats: %w", err)
+	}
+
+	// Query distinct physical slab count from sia_slabs.
+	var physicalUnitCount int64
+	err = db.RetryableComponentTransaction(s, ctx, func(tx *gorm.DB) *gorm.DB {
+		return tx.Model(&siaDB.SiaSlab{}).
+			Where("deleted_at IS NULL").
+			Count(&physicalUnitCount)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to count physical slabs: %w", err)
+	}
+
+	result := &core.ProtocolStorageStats{
+		ObjectCount:          slabStats.ObjectCount,
+		StorageBytes:         slabStats.StorageBytes,
+		PhysicalStorageBytes: slabStats.PhysicalStorageBytes,
+		PhysicalUnitCount:    uint64(physicalUnitCount),
+	}
+
+	// Update cache.
+	statsCache.Store(&cachedStats{
+		value:     result,
+		expiresAt: time.Now().Add(statsCacheTTL),
+	})
+
+	return result, nil
 }

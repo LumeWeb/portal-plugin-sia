@@ -2097,6 +2097,56 @@ func (_c *MockSiaService_UpdateFundingCursor_Call) RunAndReturn(run func(context
 	return _c
 }
 
+// StorageStats provides a mock function with given fields: ctx
+func (_m *MockSiaService) StorageStats(ctx context.Context) (*portalcore.ProtocolStorageStats, error) {
+	ret := _m.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for StorageStats")
+	}
+
+	var r0 *portalcore.ProtocolStorageStats
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context) (*portalcore.ProtocolStorageStats, error)); ok {
+		return rf(ctx)
+	}
+	if ret.Get(0) != nil {
+		r0 = ret.Get(0).(*portalcore.ProtocolStorageStats)
+	}
+	if rf, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = rf(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+type MockSiaService_StorageStats_Call struct {
+	*mock.Call
+}
+
+func (_e *MockSiaService_Expecter) StorageStats(ctx interface{}) *MockSiaService_StorageStats_Call {
+	return &MockSiaService_StorageStats_Call{Call: _e.mock.On("StorageStats", ctx)}
+}
+
+func (_c *MockSiaService_StorageStats_Call) Run(run func(ctx context.Context)) *MockSiaService_StorageStats_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context))
+	})
+	return _c
+}
+
+func (_c *MockSiaService_StorageStats_Call) Return(_a0 *portalcore.ProtocolStorageStats, _a1 error) *MockSiaService_StorageStats_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockSiaService_StorageStats_Call) RunAndReturn(run func(context.Context) (*portalcore.ProtocolStorageStats, error)) *MockSiaService_StorageStats_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // NewMockSiaService creates a new instance of MockSiaService. It also registers a testing interface on the mock and a cleanup function to assert the mocks expectations.
 // The first argument is typically a *testing.T value.
 func NewMockSiaService(t interface {
