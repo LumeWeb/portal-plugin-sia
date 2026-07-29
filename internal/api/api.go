@@ -461,13 +461,13 @@ func buildPruneSlabsRoute(a *API) router.RouteDefinition {
 }
 
 func buildDeleteSlabRoute(a *API) router.RouteDefinition {
-	return router.NewRoute(http.MethodDelete, "/slabs/:id", a.unpinSlabHandler,
+	return router.NewRoute(http.MethodDelete, "/slabs/:slabid", a.unpinSlabHandler,
 		router.WithAccess(core.ACCESS_USER_ROLE),
 		router.WithSwagger(
 			router.WithSummary("Unpin a slab"),
 			router.WithDescription("Unpins a slab. If no objects reference it, it will be removed."),
 			router.WithTags(tagSlabs),
-			router.WithPathParam("id", "Slab ID", ""),
+			router.WithPathParam("slabid", "Slab ID", ""),
 			router.WithSuccessResponse(http.StatusNoContent, "Slab unpinned successfully"),
 			router.WithErrorResponses(
 				router.DefineSwaggerErrorResponse(http.StatusNotFound, "Slab not found"),
