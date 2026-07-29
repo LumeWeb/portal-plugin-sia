@@ -62,11 +62,22 @@ func (p Protocol) PinHandler() core.ProtocolPinHandler {
 }
 
 var (
-	_ core.Protocol              = (*Protocol)(nil)
-	_ core.StorageProtocol       = (*Protocol)(nil)
-	_ core.ProtocolGetPinHandler = (*Protocol)(nil)
-	_ core.ProtocolPinHandler    = (*pinHandler)(nil)
+	_ core.Protocol                       = (*Protocol)(nil)
+	_ core.StorageProtocol                 = (*Protocol)(nil)
+	_ core.ProtocolGetPinHandler           = (*Protocol)(nil)
+	_ core.ProtocolPinHandler              = (*pinHandler)(nil)
+	_ core.ProtocolExportAccessController = (*Protocol)(nil)
 )
+
+// CanExportCID denies all CID data exports for the Sia protocol.
+// The Sia SharedObject contains slab layout, encryption keys, and sector
+// references — exposing these publicly would allow anyone to retrieve
+// and decrypt stored data directly from the Sia network.
+func (p *Protocol) CanExportCID(ctx context.Context, cidStr string) (bool, error) {
+	_, span := core.TraceMethod(ctx, "Protocol.CanExportCID")
+	defer span.End()
+	return false, core.ErrExportDenied
+}
 
 func (p *Protocol) EncodeFileName(hash core.StorageHash) string {
 	decoded, err := mh.Decode(hash.Multihash())
