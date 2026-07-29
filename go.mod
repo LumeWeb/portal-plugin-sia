@@ -12,7 +12,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	go.lumeweb.com/configmanager v0.3.29
 	go.lumeweb.com/httputil v0.5.6
-	go.lumeweb.com/portal v0.5.2-0.20260729205323-883023492d87
+	go.lumeweb.com/portal v0.5.2-0.20260729212645-a4d79a550621
 	go.lumeweb.com/portal-middleware v0.3.7
 	go.lumeweb.com/portal-plugin-quota v0.0.0-20260425220337-a342aa31f1f8
 	go.lumeweb.com/portal-router v0.7.6
@@ -24,6 +24,7 @@ require (
 	go.sia.tech/indexd v0.4.0
 	go.uber.org/zap v1.28.0
 	golang.org/x/net v0.57.0
+	golang.org/x/sync v0.22.0
 	gorm.io/datatypes v1.2.7
 	gorm.io/gorm v1.31.2
 	lukechampine.com/frand v1.5.1
@@ -208,7 +209,6 @@ require (
 	golang.org/x/crypto v0.54.0 // indirect
 	golang.org/x/exp v0.0.0-20260727155853-b88d891fe743 // indirect
 	golang.org/x/mod v0.38.0 // indirect
-	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
 	golang.org/x/time v0.15.0 // indirect

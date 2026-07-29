@@ -67,6 +67,7 @@ var (
 	_ core.ProtocolGetPinHandler           = (*Protocol)(nil)
 	_ core.ProtocolPinHandler              = (*pinHandler)(nil)
 	_ core.ProtocolExportAccessController = (*Protocol)(nil)
+	_ core.ProtocolStorageStatsProvider   = (*Protocol)(nil)
 )
 
 // CanExportCID denies all CID data exports for the Sia protocol.
@@ -77,6 +78,15 @@ func (p *Protocol) CanExportCID(ctx context.Context, cidStr string) (bool, error
 	_, span := core.TraceMethod(ctx, "Protocol.CanExportCID")
 	defer span.End()
 	return false, core.ErrExportDenied
+}
+
+// StorageStats delegates to SiaService to return protocol-specific storage
+// statistics that distinguish slab pins (physical storage) from virtual
+// object pins (which reference slabs but contribute 0 bytes).
+func (p *Protocol) StorageStats(ctx context.Context) (*core.ProtocolStorageStats, error) {
+	_, span := core.TraceMethod(ctx, "Protocol.StorageStats")
+	defer span.End()
+	return p.siaService.StorageStats(ctx)
 }
 
 func (p *Protocol) EncodeFileName(hash core.StorageHash) string {

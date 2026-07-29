@@ -45,6 +45,11 @@ type SiaService interface {
 	ListApps(ctx context.Context, userID uint, filters []queryutil.CrudFilter, sorts []queryutil.Sort, pagination queryutil.Pagination) ([]AppAccount, int64, error)
 	PruneAccount(ctx context.Context, userID uint) error
 
+	// StorageStats returns protocol-specific storage statistics for the Sia protocol.
+	// Counts slab pins only (excluding virtual object pins which have Size=0),
+	// and reports physical slab counts and redundancy-scaled storage sizes.
+	StorageStats(ctx context.Context) (*core.ProtocolStorageStats, error)
+
 	// Auth request methods
 	StoreAuthRequest(ctx context.Context, requestID string, userID uint) error
 	GetAuthRequest(ctx context.Context, requestID string) (*db.AuthRequest, error)
