@@ -341,7 +341,7 @@ func (a *API) unpinSlabHandler(c echo.Context) error {
 
 	ctx2 := c.Request().Context()
 	a.withRecordingProxy(c, func(userID uint) {
-		slabIDStr := c.Param("id")
+		slabIDStr := c.Param("slabid")
 		var slabID slabs.SlabID
 		if err := slabID.UnmarshalText([]byte(slabIDStr)); err != nil {
 			a.deletePinAndUpload(ctx2, slabIDStr, userID, c)
