@@ -184,7 +184,7 @@ func TestAuthConnectInit_Success(t *testing.T) {
 		helper := newMockHelper(t, ctx)
 
 		reqBody := indexdApp.RegisterAppRequest{
-			Name: "test-app",
+			Info: indexdApp.Info{Name: "test-app"},
 		}
 		resp := helper.makeRequest(http.MethodPost, "/auth/connect", mustMarshalJSON(t, reqBody))
 
