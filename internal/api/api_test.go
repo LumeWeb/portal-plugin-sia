@@ -16,6 +16,7 @@ import (
 	"go.sia.tech/indexd/accounts"
 	"go.sia.tech/indexd/api/app"
 	"go.sia.tech/indexd/hosts"
+	"go.sia.tech/indexd/sharing"
 	"go.sia.tech/indexd/slabs"
 
 	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
@@ -233,6 +234,78 @@ func TestMain(m *testing.M) {
 		w.Header().Set("Content-Type", "application/json")
 		encoder := json.NewEncoder(w)
 		encoder.Encode([]accounts.FundingEvent{})
+	})
+
+	// POST /sharing - Create Sharing Key
+	mux.HandleFunc("POST /sharing", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		encoder := json.NewEncoder(w)
+		encoder.Encode(sharing.Key{PublicKey: types.PublicKey{1, 2, 3}})
+	})
+
+	// GET /sharing - List Sharing Keys
+	mux.HandleFunc("GET /sharing", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		encoder := json.NewEncoder(w)
+		encoder.Encode([]sharing.Key{{PublicKey: types.PublicKey{1, 2, 3}}})
+	})
+
+	// GET /sharing/{key} - Get Sharing Key
+	mux.HandleFunc("GET /sharing/{key}", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		encoder := json.NewEncoder(w)
+		encoder.Encode(sharing.Key{PublicKey: types.PublicKey{1, 2, 3}})
+	})
+
+	// DELETE /sharing/{key} - Delete Sharing Key
+	mux.HandleFunc("DELETE /sharing/{key}", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	// POST /sharing/{key}/objects - Attach Object
+	mux.HandleFunc("POST /sharing/{key}/objects", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	// GET /sharing/{key}/objects - List Attached Objects
+	mux.HandleFunc("GET /sharing/{key}/objects", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		encoder := json.NewEncoder(w)
+		encoder.Encode([]slabs.SealedObject{})
+	})
+
+	// DELETE /sharing/{key}/objects/{objectkey} - Detach Object
+	mux.HandleFunc("DELETE /sharing/{key}/objects/{objectkey}", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	// GET /shared - Sharing Key Stats
+	mux.HandleFunc("GET /shared", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		encoder := json.NewEncoder(w)
+		encoder.Encode(sharing.KeyStats{ObjectCount: 1})
+	})
+
+	// GET /shared/objects - List Shared Objects
+	mux.HandleFunc("GET /shared/objects", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		encoder := json.NewEncoder(w)
+		encoder.Encode([]slabs.SealedObject{})
+	})
+
+	// GET /shared/objects/{id} - Get Shared Object
+	mux.HandleFunc("GET /shared/objects/{id}", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		encoder := json.NewEncoder(w)
+		encoder.Encode(slabs.SealedObject{})
+	})
+
+	// GET /shared/hosts - List Shared Hosts
+	mux.HandleFunc("GET /shared/hosts", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		encoder := json.NewEncoder(w)
+		encoder.Encode([]app.SharedHost{})
 	})
 
 	// Catch-all for unhandled routes - return error to catch missing handlers

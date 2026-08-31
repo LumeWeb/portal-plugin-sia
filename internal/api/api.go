@@ -21,6 +21,7 @@ import (
 	// Import indexd types for swagger documentation
 	indexdApp "go.sia.tech/indexd/api/app"
 	"go.sia.tech/indexd/hosts"
+	"go.sia.tech/indexd/sharing"
 	"go.sia.tech/indexd/slabs"
 )
 
@@ -33,6 +34,7 @@ const (
 	tagObjects  = "objects"
 	tagSlabs    = "slabs"
 	tagAuth     = "auth"
+	tagSharing  = "sharing"
 )
 
 // routeDef defines a proxy route with its swagger metadata
@@ -45,8 +47,9 @@ type routeDef struct {
 	swagger []router.SwaggerOption
 }
 
-// proxyRouteDefinitions defines read-only indexd proxy routes with their swagger metadata.
-// Mutating routes (pin, unpin, prune) have dedicated intercept handlers.
+// proxyRouteDefinitions defines indexd proxy routes with their swagger metadata.
+// Mutating routes that touch portal state (pin, unpin, prune) have dedicated
+// intercept handlers; all sharing routes pass through to indexd unchanged.
 var proxyRouteDefinitions = []routeDef{
 	{
 		method:  http.MethodGet,
@@ -119,6 +122,7 @@ var proxyRouteDefinitions = []routeDef{
 			router.WithErrorResponses(
 				router.DefineSwaggerErrorResponses(
 					router.DefineSwaggerErrorResponse(http.StatusNotFound, "Object not found"),
+					router.DefineSwaggerErrorResponse(http.StatusUnavailableForLegalReasons, "Object blocked"),
 				),
 			),
 		},
@@ -152,6 +156,195 @@ var proxyRouteDefinitions = []routeDef{
 			),
 			router.WithErrorResponses(
 				router.DefineSwaggerErrorResponse(http.StatusNotFound, "Slab not found"),
+			),
+		},
+	},
+	{
+		method:  http.MethodPost,
+		path:    "/sharing",
+		summary: "Create a sharing key",
+		desc:    "Creates a sharing key granting read-only access to a specific set of objects.",
+		tags:    []string{tagSharing},
+		swagger: []router.SwaggerOption{
+			router.WithRequestBody(sharing.KeyRequest{}, "Sharing key creation request", true),
+			router.WithSuccessResponse(http.StatusOK, "Sharing key created",
+				router.WithJSONContent(sharing.Key{}),
+			),
+			router.WithErrorResponses(
+				router.DefineSwaggerErrorResponses(
+					router.DefineSwaggerErrorResponse(http.StatusBadRequest, "Invalid request"),
+					router.DefineSwaggerErrorResponse(http.StatusConflict, "Sharing key already exists"),
+				),
+			),
+		},
+	},
+	{
+		method:  http.MethodGet,
+		path:    "/sharing",
+		summary: "List sharing keys",
+		desc:    "Lists sharing keys for the authenticated account with pagination.",
+		tags:    []string{tagSharing},
+		swagger: []router.SwaggerOption{
+			router.WithQueryParam("limit", "Max results (1-500)", int(100)),
+			router.WithQueryParam("offset", "Results to skip", int(0)),
+			router.WithSuccessResponse(http.StatusOK, "List of sharing keys",
+				router.WithJSONContent([]sharing.Key{}),
+			),
+		},
+	},
+	{
+		method:  http.MethodGet,
+		path:    "/sharing/:key",
+		summary: "Get a sharing key",
+		desc:    "Returns details of a sharing key owned by the authenticated account.",
+		tags:    []string{tagSharing},
+		swagger: []router.SwaggerOption{
+			router.WithPathParam("key", "Sharing key public key", ""),
+			router.WithSuccessResponse(http.StatusOK, "Sharing key details",
+				router.WithJSONContent(sharing.Key{}),
+			),
+			router.WithErrorResponses(
+				router.DefineSwaggerErrorResponse(http.StatusNotFound, "Sharing key not found"),
+			),
+		},
+	},
+	{
+		method:  http.MethodDelete,
+		path:    "/sharing/:key",
+		summary: "Delete a sharing key",
+		desc:    "Deletes a sharing key, revoking read access to all objects attached to it.",
+		tags:    []string{tagSharing},
+		swagger: []router.SwaggerOption{
+			router.WithPathParam("key", "Sharing key public key", ""),
+			router.WithSuccessResponse(http.StatusNoContent, "Sharing key deleted"),
+			router.WithErrorResponses(
+				router.DefineSwaggerErrorResponse(http.StatusNotFound, "Sharing key not found"),
+			),
+		},
+	},
+	{
+		method:  http.MethodPost,
+		path:    "/sharing/:key/objects",
+		summary: "Attach an object to a sharing key",
+		desc:    "Attaches an object to a sharing key, granting read access to the recipient.",
+		tags:    []string{tagSharing},
+		swagger: []router.SwaggerOption{
+			router.WithPathParam("key", "Sharing key public key", ""),
+			router.WithRequestBody(sharing.SharedObjectRequest{}, "Shared object request with re-sealed keys", true),
+			router.WithSuccessResponse(http.StatusNoContent, "Object attached"),
+			router.WithErrorResponses(
+				router.DefineSwaggerErrorResponses(
+					router.DefineSwaggerErrorResponse(http.StatusBadRequest, "Invalid request"),
+					router.DefineSwaggerErrorResponse(http.StatusNotFound, "Sharing key or object not found"),
+					router.DefineSwaggerErrorResponse(http.StatusConflict, "Attachment conflicts with existing one"),
+					router.DefineSwaggerErrorResponse(http.StatusUnavailableForLegalReasons, "Object blocked"),
+				),
+			),
+		},
+	},
+	{
+		method:  http.MethodGet,
+		path:    "/sharing/:key/objects",
+		summary: "List objects attached to a sharing key",
+		desc:    "Lists objects attached to a sharing key owned by the authenticated account.",
+		tags:    []string{tagSharing},
+		swagger: []router.SwaggerOption{
+			router.WithPathParam("key", "Sharing key public key", ""),
+			router.WithQueryParam("limit", "Max results (1-500)", int(100)),
+			router.WithQueryParam("offset", "Results to skip", int(0)),
+			router.WithSuccessResponse(http.StatusOK, "List of shared objects",
+				router.WithJSONContent([]slabs.SealedObject{}),
+			),
+			router.WithErrorResponses(
+				router.DefineSwaggerErrorResponse(http.StatusNotFound, "Sharing key not found"),
+			),
+		},
+	},
+	{
+		method:  http.MethodDelete,
+		path:    "/sharing/:key/objects/:objectkey",
+		summary: "Detach an object from a sharing key",
+		desc:    "Detaches an object from a sharing key, revoking read access to that object.",
+		tags:    []string{tagSharing},
+		swagger: []router.SwaggerOption{
+			router.WithPathParam("key", "Sharing key public key", ""),
+			router.WithPathParam("objectkey", "Object key", ""),
+			router.WithSuccessResponse(http.StatusNoContent, "Object detached"),
+			router.WithErrorResponses(
+				router.DefineSwaggerErrorResponse(http.StatusNotFound, "Shared object not found"),
+			),
+		},
+	},
+}
+
+// sharedProxyRouteDefinitions defines the recipient-facing indexd sharing proxy
+// routes with their swagger metadata. These routes are authenticated inside
+// indexd using the sharing key's signed URL, so the portal only adds CORS.
+var sharedProxyRouteDefinitions = []routeDef{
+	{
+		method:  http.MethodGet,
+		path:    "/shared",
+		summary: "Get sharing key stats",
+		desc:    "Aggregate totals of a sharing key, safe to return to recipients.",
+		tags:    []string{tagSharing},
+		swagger: []router.SwaggerOption{
+			router.WithSuccessResponse(http.StatusOK, "Sharing key stats",
+				router.WithJSONContent(sharing.KeyStats{}),
+			),
+			router.WithErrorResponses(
+				router.DefineSwaggerErrorResponse(http.StatusUnauthorized, "Invalid sharing key"),
+			),
+		},
+	},
+	{
+		method:  http.MethodGet,
+		path:    "/shared/objects",
+		summary: "List shared objects",
+		desc:    "Lists objects attached to the authenticated sharing key with pagination.",
+		tags:    []string{tagSharing},
+		swagger: []router.SwaggerOption{
+			router.WithQueryParam("limit", "Max results (1-500)", int(100)),
+			router.WithQueryParam("offset", "Results to skip", int(0)),
+			router.WithSuccessResponse(http.StatusOK, "List of shared objects",
+				router.WithJSONContent([]slabs.SealedObject{}),
+			),
+			router.WithErrorResponses(
+				router.DefineSwaggerErrorResponse(http.StatusUnauthorized, "Invalid sharing key"),
+			),
+		},
+	},
+	{
+		method:  http.MethodGet,
+		path:    "/shared/objects/:id",
+		summary: "Get a shared object",
+		desc:    "Returns an object's metadata accessible with a valid sharing key.",
+		tags:    []string{tagSharing},
+		swagger: []router.SwaggerOption{
+			router.WithPathParam("id", "Object key", ""),
+			router.WithSuccessResponse(http.StatusOK, "Shared object",
+				router.WithJSONContent(slabs.SealedObject{}),
+			),
+			router.WithErrorResponses(
+				router.DefineSwaggerErrorResponses(
+					router.DefineSwaggerErrorResponse(http.StatusUnauthorized, "Invalid sharing key"),
+					router.DefineSwaggerErrorResponse(http.StatusNotFound, "Shared object not found"),
+					router.DefineSwaggerErrorResponse(http.StatusUnavailableForLegalReasons, "Object blocked"),
+				),
+			),
+		},
+	},
+	{
+		method:  http.MethodGet,
+		path:    "/shared/hosts",
+		summary: "List usable hosts for the sharing key",
+		desc:    "Lists usable hosts paired with account tokens the recipient can use to pay for downloads.",
+		tags:    []string{tagSharing},
+		swagger: []router.SwaggerOption{
+			router.WithSuccessResponse(http.StatusOK, "List of shared hosts",
+				router.WithJSONContent([]indexdApp.SharedHost{}),
+			),
+			router.WithErrorResponses(
+				router.DefineSwaggerErrorResponse(http.StatusUnauthorized, "Invalid sharing key"),
 			),
 		},
 	},
@@ -357,6 +550,12 @@ func (a *API) Configure(r router.Router, accessSvc core.AccessService) error {
 		return fmt.Errorf("failed to register proxy routes: %w", err)
 	}
 
+	// Recipient sharing routes are authenticated inside indexd via the sharing
+	// key's signed URL, so the portal only needs CORS (no signed middleware).
+	if err := a.registerRoutes(r, accessSvc, buildSharedRoutes(a), router.WithCors()); err != nil {
+		return fmt.Errorf("failed to register shared routes: %w", err)
+	}
+
 	// Connect approval (JWT auth), register (anonymous), and public status routes
 	if err := a.registerRoutes(r, accessSvc, buildConnectRoutes(a), router.WithCors()); err != nil {
 		return fmt.Errorf("failed to register connect routes: %w", err)
@@ -508,10 +707,24 @@ func buildDeleteObjectRoute(a *API) router.RouteDefinition {
 	)
 }
 
+// buildProxyRoutes builds the signed-auth proxy routes from proxyRouteDefinitions.
 func buildProxyRoutes(a *API) []router.RouteDefinition {
-	routes := make([]router.RouteDefinition, 0, len(proxyRouteDefinitions))
+	return buildRoutesFromDefs(a, proxyRouteDefinitions)
+}
 
-	for _, def := range proxyRouteDefinitions {
+// buildSharedRoutes builds the recipient-sharing proxy routes from
+// sharedProxyRouteDefinitions. These are registered without the portal's Sia
+// signed URL middleware since indexd authenticates the sharing key itself.
+func buildSharedRoutes(a *API) []router.RouteDefinition {
+	return buildRoutesFromDefs(a, sharedProxyRouteDefinitions)
+}
+
+// buildRoutesFromDefs converts routeDef entries into router.RouteDefinition
+// values backed by the reverse proxy handler.
+func buildRoutesFromDefs(a *API, defs []routeDef) []router.RouteDefinition {
+	routes := make([]router.RouteDefinition, 0, len(defs))
+
+	for _, def := range defs {
 		opts := []router.RouteOption{
 			router.WithSwagger(
 				append([]router.SwaggerOption{

@@ -15,6 +15,7 @@ import (
 	coreTesting "go.lumeweb.com/portal/core/testing"
 	indexdApp "go.sia.tech/indexd/api/app"
 	"go.sia.tech/core/types"
+	"go.sia.tech/indexd/sharing"
 	"go.sia.tech/indexd/slabs"
 	"gorm.io/gorm"
 )
@@ -281,5 +282,130 @@ func TestAuthConnectRegister_Success(t *testing.T) {
 		resp := helper.makeRequest(http.MethodPost, "/auth/connect/test-request-id/register", mustMarshalJSON(t, reqBody))
 
 		assert.Equal(t, http.StatusNoContent, resp.Code)
+	}, TestOptions)
+}
+
+func TestCreateSharingKey_Success(t *testing.T) {
+	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
+		helper := newMockHelper(t, ctx)
+		sk, _ := helper.setupSignedAccount()
+
+		reqBody := mustMarshalJSON(t, sharing.KeyRequest{
+			PublicKey:   sk.PublicKey(),
+			Nonce:       sharing.Nonce{1, 2, 3},
+			Description: "test sharing key",
+		})
+		resp := helper.makeSignedRequest(http.MethodPost, "/sharing", sk, reqBody)
+
+		assert.Equal(t, http.StatusOK, resp.Code)
+	}, TestOptions)
+}
+
+func TestListSharingKeys_Success(t *testing.T) {
+	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
+		helper := newMockHelper(t, ctx)
+		sk, _ := helper.setupSignedAccount()
+
+		resp := helper.makeSignedRequest(http.MethodGet, "/sharing", sk, nil)
+
+		assert.Equal(t, http.StatusOK, resp.Code)
+	}, TestOptions)
+}
+
+func TestGetSharingKey_Success(t *testing.T) {
+	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
+		helper := newMockHelper(t, ctx)
+		sk, _ := helper.setupSignedAccount()
+
+		resp := helper.makeSignedRequest(http.MethodGet, fmt.Sprintf("/sharing/%s", sk.PublicKey().String()), sk, nil)
+
+		assert.Equal(t, http.StatusOK, resp.Code)
+	}, TestOptions)
+}
+
+func TestDeleteSharingKey_Success(t *testing.T) {
+	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
+		helper := newMockHelper(t, ctx)
+		sk, _ := helper.setupSignedAccount()
+
+		resp := helper.makeSignedRequest(http.MethodDelete, fmt.Sprintf("/sharing/%s", sk.PublicKey().String()), sk, nil)
+
+		assert.Equal(t, http.StatusNoContent, resp.Code)
+	}, TestOptions)
+}
+
+func TestAttachSharedObject_Success(t *testing.T) {
+	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
+		helper := newMockHelper(t, ctx)
+		sk, _ := helper.setupSignedAccount()
+
+		reqBody := mustMarshalJSON(t, sharing.SharedObjectRequest{
+			ObjectID: newTestHash256(1),
+		})
+		resp := helper.makeSignedRequest(http.MethodPost, fmt.Sprintf("/sharing/%s/objects", sk.PublicKey().String()), sk, reqBody)
+
+		assert.Equal(t, http.StatusNoContent, resp.Code)
+	}, TestOptions)
+}
+
+func TestListSharingKeyObjects_Success(t *testing.T) {
+	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
+		helper := newMockHelper(t, ctx)
+		sk, _ := helper.setupSignedAccount()
+
+		resp := helper.makeSignedRequest(http.MethodGet, fmt.Sprintf("/sharing/%s/objects", sk.PublicKey().String()), sk, nil)
+
+		assert.Equal(t, http.StatusOK, resp.Code)
+	}, TestOptions)
+}
+
+func TestDetachSharedObject_Success(t *testing.T) {
+	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
+		helper := newMockHelper(t, ctx)
+		sk, _ := helper.setupSignedAccount()
+
+		resp := helper.makeSignedRequest(http.MethodDelete, fmt.Sprintf("/sharing/%s/objects/%s", sk.PublicKey().String(), newTestHash256(1).String()), sk, nil)
+
+		assert.Equal(t, http.StatusNoContent, resp.Code)
+	}, TestOptions)
+}
+
+func TestGetSharedStats_Success(t *testing.T) {
+	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
+		helper := newMockHelper(t, ctx)
+
+		resp := helper.makeRequest(http.MethodGet, "/shared", nil)
+
+		assert.Equal(t, http.StatusOK, resp.Code)
+	}, TestOptions)
+}
+
+func TestSharedListObjects_Success(t *testing.T) {
+	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
+		helper := newMockHelper(t, ctx)
+
+		resp := helper.makeRequest(http.MethodGet, "/shared/objects", nil)
+
+		assert.Equal(t, http.StatusOK, resp.Code)
+	}, TestOptions)
+}
+
+func TestGetSharedObject_Success(t *testing.T) {
+	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
+		helper := newMockHelper(t, ctx)
+
+		resp := helper.makeRequest(http.MethodGet, fmt.Sprintf("/shared/objects/%s", newTestHash256(1).String()), nil)
+
+		assert.Equal(t, http.StatusOK, resp.Code)
+	}, TestOptions)
+}
+
+func TestGetSharedHosts_Success(t *testing.T) {
+	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
+		helper := newMockHelper(t, ctx)
+
+		resp := helper.makeRequest(http.MethodGet, "/shared/hosts", nil)
+
+		assert.Equal(t, http.StatusOK, resp.Code)
 	}, TestOptions)
 }
