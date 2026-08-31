@@ -282,6 +282,9 @@ func TestMain(m *testing.M) {
 
 	// GET /shared - Sharing Key Stats
 	mux.HandleFunc("GET /shared", func(w http.ResponseWriter, r *http.Request) {
+		if !requireSharingKeyAuth(w, r) {
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		encoder := json.NewEncoder(w)
 		encoder.Encode(sharing.KeyStats{ObjectCount: 1})
@@ -289,6 +292,9 @@ func TestMain(m *testing.M) {
 
 	// GET /shared/objects - List Shared Objects
 	mux.HandleFunc("GET /shared/objects", func(w http.ResponseWriter, r *http.Request) {
+		if !requireSharingKeyAuth(w, r) {
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		encoder := json.NewEncoder(w)
 		encoder.Encode([]slabs.SealedObject{})
@@ -296,6 +302,9 @@ func TestMain(m *testing.M) {
 
 	// GET /shared/objects/{id} - Get Shared Object
 	mux.HandleFunc("GET /shared/objects/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if !requireSharingKeyAuth(w, r) {
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		encoder := json.NewEncoder(w)
 		encoder.Encode(slabs.SealedObject{})
@@ -303,6 +312,9 @@ func TestMain(m *testing.M) {
 
 	// GET /shared/hosts - List Shared Hosts
 	mux.HandleFunc("GET /shared/hosts", func(w http.ResponseWriter, r *http.Request) {
+		if !requireSharingKeyAuth(w, r) {
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		encoder := json.NewEncoder(w)
 		encoder.Encode([]app.SharedHost{})
@@ -329,6 +341,23 @@ func TestMain(m *testing.M) {
 			AppURL: fakeIndexd.URL,
 		}),
 	)
+}
+
+// requireSharingKeyAuth mirrors indexd's sharing-key authentication contract
+// for the recipient /shared* routes: the request must carry the Sia signed-URL
+// credential/signature/validUntil query params. When they are absent, it writes
+// a 401 response and returns false, so callers should halt. The portal proxies
+// these routes without its own auth middleware, so indexd enforces the sharing
+// key signature; this guard keeps the mock faithful to that behavior.
+func requireSharingKeyAuth(w http.ResponseWriter, r *http.Request) bool {
+	q := r.URL.Query()
+	if !q.Has(queryParamCredential) || !q.Has(queryParamSignature) || !q.Has(queryParamValidUntil) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "unauthorized"})
+		return false
+	}
+	return true
 }
 
 func fakeIndexdAuthConnectHTML(name, description, logoURL, callbackURL string) string {

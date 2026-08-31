@@ -373,8 +373,9 @@ func TestDetachSharedObject_Success(t *testing.T) {
 func TestGetSharedStats_Success(t *testing.T) {
 	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
 		helper := newMockHelper(t, ctx)
+		sk := types.GeneratePrivateKey()
 
-		resp := helper.makeRequest(http.MethodGet, "/shared", nil)
+		resp := helper.makeSignedRequest(http.MethodGet, "/shared", sk, nil)
 
 		assert.Equal(t, http.StatusOK, resp.Code)
 	}, TestOptions)
@@ -383,8 +384,9 @@ func TestGetSharedStats_Success(t *testing.T) {
 func TestSharedListObjects_Success(t *testing.T) {
 	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
 		helper := newMockHelper(t, ctx)
+		sk := types.GeneratePrivateKey()
 
-		resp := helper.makeRequest(http.MethodGet, "/shared/objects", nil)
+		resp := helper.makeSignedRequest(http.MethodGet, "/shared/objects", sk, nil)
 
 		assert.Equal(t, http.StatusOK, resp.Code)
 	}, TestOptions)
@@ -393,8 +395,9 @@ func TestSharedListObjects_Success(t *testing.T) {
 func TestGetSharedObject_Success(t *testing.T) {
 	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
 		helper := newMockHelper(t, ctx)
+		sk := types.GeneratePrivateKey()
 
-		resp := helper.makeRequest(http.MethodGet, fmt.Sprintf("/shared/objects/%s", newTestHash256(1).String()), nil)
+		resp := helper.makeSignedRequest(http.MethodGet, fmt.Sprintf("/shared/objects/%s", newTestHash256(1).String()), sk, nil)
 
 		assert.Equal(t, http.StatusOK, resp.Code)
 	}, TestOptions)
@@ -403,9 +406,31 @@ func TestGetSharedObject_Success(t *testing.T) {
 func TestGetSharedHosts_Success(t *testing.T) {
 	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
 		helper := newMockHelper(t, ctx)
+		sk := types.GeneratePrivateKey()
 
-		resp := helper.makeRequest(http.MethodGet, "/shared/hosts", nil)
+		resp := helper.makeSignedRequest(http.MethodGet, "/shared/hosts", sk, nil)
 
 		assert.Equal(t, http.StatusOK, resp.Code)
+	}, TestOptions)
+}
+
+// TestSharedRoutes_Unauthenticated verifies that requests without sharing-key
+// signed-URL params are forwarded to indexd and rejected there with 401. The
+// portal proxies the /shared* routes without its own auth middleware, so this
+// guard confirms the upstream sharing-key auth is exercised rather than open.
+func TestSharedRoutes_Unauthenticated(t *testing.T) {
+	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
+		helper := newMockHelper(t, ctx)
+
+		paths := []string{
+			"/shared",
+			"/shared/objects",
+			fmt.Sprintf("/shared/objects/%s", newTestHash256(1).String()),
+			"/shared/hosts",
+		}
+		for _, p := range paths {
+			resp := helper.makeRequest(http.MethodGet, p, nil)
+			assert.Equal(t, http.StatusUnauthorized, resp.Code, "expected 401 for %s", p)
+		}
 	}, TestOptions)
 }
