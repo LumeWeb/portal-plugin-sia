@@ -9,5 +9,5 @@ jobs:
     uses: LumeWeb/workflows/.github/workflows/build-plugin.yml@develop
     with:
       additional_dependencies: 'go.lumeweb.com/portal-plugin-core@develop,go.lumeweb.com/portal-plugin-quota@develop,go.lumeweb.com/portal-plugin-dashboard@develop'
-      replacements: 'go.sia.tech/indexd=go.lumeweb.com/indexd@v0.0.0-20260831090151-1f5a65a54d5d'
+      replacements: 'go.sia.tech/indexd=go.lumeweb.com/indexd@v0.0.0-20260831092940-91324c776f0a'
     secrets: inherit
