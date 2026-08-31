@@ -21,7 +21,7 @@ require (
 	go.opentelemetry.io/otel v1.44.0
 	go.sia.tech/core v0.21.7
 	go.sia.tech/coreutils v0.24.0
-	go.sia.tech/indexd v0.4.1
+	go.sia.tech/indexd v0.4.5-0.20260831084636-eb58007edc01
 	go.uber.org/zap v1.28.0
 	golang.org/x/net v0.57.0
 	golang.org/x/sync v0.22.0
@@ -199,7 +199,7 @@ require (
 	go.shabbyrobe.org/gocovmerge v0.0.0-20230507111327-fa4f82cfbf4d // indirect
 	go.sia.tech/jape v0.14.1 // indirect
 	go.sia.tech/mux v1.5.3 // indirect
-	go.sia.tech/siastorage v0.1.1-0.20260730113653-ca2ffd94f7a0 // indirect
+	go.sia.tech/siastorage v0.2.2-0.20260831091740-f9961f7e5391 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap/exp v0.3.0 // indirect
@@ -233,4 +233,4 @@ require (
 	modernc.org/sqlite v1.54.0 // indirect
 )
 
-replace go.sia.tech/indexd => go.lumeweb.com/indexd v0.0.0-20260831090151-1f5a65a54d5d
+replace go.sia.tech/indexd => go.lumeweb.com/indexd v0.0.0-20260831092940-91324c776f0a
