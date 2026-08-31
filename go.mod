@@ -1,6 +1,6 @@
 module go.lumeweb.com/portal-plugin-sia
 
-go 1.26.0
+go 1.27.0
 
 require (
 	github.com/Oudwins/zog v0.22.2
@@ -20,7 +20,7 @@ require (
 	go.lumeweb.com/web/go/portal-plugin-sia v0.0.0-20260630053457-d84cb76aa9af
 	go.opentelemetry.io/otel v1.44.0
 	go.sia.tech/core v0.21.7
-	go.sia.tech/coreutils v0.23.6-0.20260730084356-d53a68fc6403
+	go.sia.tech/coreutils v0.24.0
 	go.sia.tech/indexd v0.4.1
 	go.uber.org/zap v1.28.0
 	golang.org/x/net v0.57.0
@@ -115,7 +115,7 @@ require (
 	github.com/kenshaw/snaker v0.4.3 // indirect
 	github.com/klauspost/compress v1.19.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
-	github.com/klauspost/reedsolomon v1.14.1 // indirect
+	github.com/klauspost/reedsolomon v1.14.2 // indirect
 	github.com/knadh/koanf/maps v0.1.2 // indirect
 	github.com/knadh/koanf/parsers/json v1.0.0 // indirect
 	github.com/knadh/koanf/parsers/yaml v1.1.0 // indirect
@@ -206,11 +206,11 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
 	golang.org/x/arch v0.24.0 // indirect
-	golang.org/x/crypto v0.54.0 // indirect
+	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/exp v0.0.0-20260727155853-b88d891fe743 // indirect
 	golang.org/x/mod v0.38.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/text v0.40.0 // indirect
+	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.48.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260526163538-3dc84a4a5aaa // indirect
@@ -233,4 +233,4 @@ require (
 	modernc.org/sqlite v1.54.0 // indirect
 )
 
-replace go.sia.tech/indexd => go.lumeweb.com/indexd v0.0.0-20260730194108-ad3e1d05fade
+replace go.sia.tech/indexd => go.lumeweb.com/indexd v0.0.0-20260831090151-1f5a65a54d5d
