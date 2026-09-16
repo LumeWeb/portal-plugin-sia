@@ -2,6 +2,7 @@ package quota
 
 import (
 	"context"
+	"math"
 	"testing"
 	"time"
 
@@ -121,7 +122,9 @@ func quotaTestOptionsWithMockAdminAndQuotaCoreHandle(t *testing.T) (coreTesting.
 func TestProvisionAccount_Success(t *testing.T) {
 	opts, mockAdmin := quotaTestOptionsWithMockAdmin(t)
 
-	mockAdmin.EXPECT().PutQuota(mock.Anything, "user-1", mock.AnythingOfType("accounts.PutQuotaRequest")).Return(nil)
+	mockAdmin.EXPECT().PutQuota(mock.Anything, "user-1", mock.MatchedBy(func(req accounts.PutQuotaRequest) bool {
+		return req.MaxPinnedData == math.MaxInt64-1
+	})).Return(nil)
 	mockAdmin.EXPECT().AddAppConnectKey(mock.Anything, mock.AnythingOfType("accounts.AppConnectKeyRequest")).Return(accounts.ConnectKey{
 		Key: "test-connect-key",
 	}, nil)
