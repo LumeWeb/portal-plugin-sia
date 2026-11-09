@@ -12,6 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
 	"go.lumeweb.com/portal-plugin-sia/internal"
+	"go.lumeweb.com/portal-plugin-sia/internal/appquery"
 	pluginConfig "go.lumeweb.com/portal-plugin-sia/internal/config"
 	siaDB "go.lumeweb.com/portal-plugin-sia/internal/db"
 	"go.lumeweb.com/portal-plugin-sia/internal/events"
@@ -792,6 +793,11 @@ func (s *SiaService) PruneSlabs(ctx context.Context, siaAppAccountID uint) error
 func (s *SiaService) ListApps(ctx context.Context, userID uint, filters []queryutil.CrudFilter, sorts []queryutil.Sort, pagination queryutil.Pagination) ([]pluginCore.AppAccount, int64, error) {
 	ctx, span := core.TraceMethod(ctx, "SiaService.ListApps")
 	defer span.End()
+
+	filters, err := appquery.Policy().Normalize(filters, sorts)
+	if err != nil {
+		return nil, 0, err
+	}
 
 	// 1. Get the user's Sia account (provides siaAccountID for the filter)
 	account, err := s.GetAccount(ctx, userID)

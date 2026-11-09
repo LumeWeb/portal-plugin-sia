@@ -475,6 +475,10 @@ go.lumeweb.com/portal-router v0.7.6 h1:9q4i4SqhaE39ecJSlLfBIDF6vZ5Jd2S+tYSOZb11c
 go.lumeweb.com/portal-router v0.7.6/go.mod h1:hl51sHDKcgw8yxJ6RraYBOI1Vnufq33FhKwfKiqCkVg=
 go.lumeweb.com/queryutil v0.3.17 h1:rbMj1ZpG1KL1UUvMYS9+JYdjOcUW6YAfXjy0J2XPWYI=
 go.lumeweb.com/queryutil v0.3.17/go.mod h1:6bcNItUrPwjGAz9pBFPxO509apXcWU8VD1lc+vur/IA=
+go.lumeweb.com/queryutil v0.3.20 h1:SUExZoTx5BEx8lscZIzSsBvy70cw3y1iQtb404bpmTM=
+go.lumeweb.com/queryutil v0.3.20/go.mod h1:0ulQYRI0uFbA8CkPHhQ471/7BmpZK46vXV6ivPDhmnw=
+go.lumeweb.com/queryutil v0.3.21 h1:Fof+LUQolHdcDJESs2pCR7Cg1Uaf/2g8/Hoa4AespHo=
+go.lumeweb.com/queryutil v0.3.21/go.mod h1:4HHIyJK85wSxRSTdjUryPktIKw+3S7nFE8p/cGlqs5Y=
 go.lumeweb.com/web/go/portal-plugin-sia v0.0.0-20260630053457-d84cb76aa9af h1:QN3JhAvS8Ws3Zoz5WRs0lWNoCfAGYUexE+WPxSJdggo=
 go.lumeweb.com/web/go/portal-plugin-sia v0.0.0-20260630053457-d84cb76aa9af/go.mod h1:xSUTv2pXNgEn1YMNLJLwrOgUnE4yfmyHbnHbadxc4Q4=
 go.opentelemetry.io/auto/sdk v1.2.1 h1:jXsnJ4Lmnqd11kwkBV2LgLoFMZKizbCi5fNZ/ipaZ64=
