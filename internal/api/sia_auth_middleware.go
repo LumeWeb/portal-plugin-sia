@@ -102,7 +102,7 @@ func SiaSignedURLMiddleware(siaService pluginCore.SiaService, hostname string, l
 					zap.String("host", hostname),
 					zap.Error(err),
 				)
-				return echo.NewHTTPError(http.StatusUnauthorized, "failed to read request body")
+				return bodyReadError(err, http.StatusUnauthorized)
 			}
 			req.Body = io.NopCloser(bodyReader(body))
 

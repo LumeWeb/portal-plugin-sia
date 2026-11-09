@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
+	echoMiddleware "github.com/labstack/echo/v4/middleware"
 	jwt "go.lumeweb.com/portal-middleware/auth/jwt"
 	middleware "go.lumeweb.com/portal-middleware/middleware"
 	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
@@ -519,7 +520,12 @@ func (a *API) OpenAPIInfo() router.APIInfoDefinition {
 
 // registerRoutes is a shorthand for RegisterRoutes with the API's standard args.
 func (a *API) registerRoutes(r router.Router, accessSvc core.AccessService, routes []router.RouteDefinition, opts ...router.RouteOption) error {
-	return router.RegisterRoutes(r, accessSvc, a.Subdomain(), routes, opts...)
+	boundedRoutes := append([]router.RouteDefinition(nil), routes...)
+	bodyLimit := echoMiddleware.BodyLimit("10MiB")
+	for i := range boundedRoutes {
+		boundedRoutes[i].Middlewares = append([]echo.MiddlewareFunc{bodyLimit}, boundedRoutes[i].Middlewares...)
+	}
+	return router.RegisterRoutes(r, accessSvc, a.Subdomain(), boundedRoutes, opts...)
 }
 
 // jwtAuthMW returns JWT auth middleware for login+API purposes.
