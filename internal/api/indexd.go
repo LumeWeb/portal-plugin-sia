@@ -149,7 +149,7 @@ func (a *API) pinSlabHandler(c echo.Context) error {
 	body, err := io.ReadAll(c.Request().Body)
 	if err != nil {
 		PinSlabTotal.WithLabelValues(LabelStatusError).Inc()
-		return echo.NewHTTPError(http.StatusBadRequest, "failed to read request body")
+		return bodyReadError(err, http.StatusBadRequest)
 	}
 
 	var params []slabs.SlabPinParams
@@ -223,7 +223,7 @@ func (a *API) pinObjectHandler(c echo.Context) error {
 	body, err := io.ReadAll(c.Request().Body)
 	if err != nil {
 		PinObjectTotal.WithLabelValues(LabelStatusError).Inc()
-		return echo.NewHTTPError(http.StatusBadRequest, "failed to read request body")
+		return bodyReadError(err, http.StatusBadRequest)
 	}
 
 	var req slabs.PinObjectRequest

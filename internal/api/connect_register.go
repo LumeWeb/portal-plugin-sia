@@ -24,7 +24,7 @@ func (a *API) HandlePOSTAuthConnectRegister(c echo.Context) error {
 	body, err := io.ReadAll(c.Request().Body)
 	if err != nil {
 		a.Logger().Error("failed to read request body", zap.Error(err))
-		return echo.NewHTTPError(http.StatusBadRequest, "failed to read request body")
+		return bodyReadError(err, http.StatusBadRequest)
 	}
 	defer c.Request().Body.Close()
 
