@@ -7,11 +7,11 @@ import (
 
 	"github.com/labstack/echo/v4"
 	mcontext "go.lumeweb.com/portal-middleware/context"
-	router "go.lumeweb.com/portal-router"
-	core "go.lumeweb.com/portal/core"
 	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
 	"go.lumeweb.com/portal-plugin-sia/internal"
 	"go.lumeweb.com/portal-plugin-sia/internal/api/dto"
+	router "go.lumeweb.com/portal-router"
+	core "go.lumeweb.com/portal/core"
 	"go.lumeweb.com/queryutil"
 	queryutilHttp "go.lumeweb.com/queryutil/http"
 	"go.uber.org/zap"
@@ -66,6 +66,10 @@ func (a *API) deleteAppHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusUnauthorized, "login required")
 	}
 
+	if err := checkIgnoredBody(c); err != nil {
+		return err
+	}
+
 	// Get the user's Sia account
 	account, err := a.siaSvc.GetAccount(c.Request().Context(), userID)
 	if err != nil {
@@ -93,6 +97,10 @@ func (a *API) pruneAccountHandler(c echo.Context) error {
 	userID, err := mcontext.GetUserID(c)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, "login required")
+	}
+
+	if err := checkIgnoredBody(c); err != nil {
+		return err
 	}
 
 	if err := a.siaSvc.PruneAccount(c.Request().Context(), userID); err != nil {

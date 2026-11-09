@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -43,6 +44,38 @@ func TestConnectAcceptsRequestBodyAtLimit(t *testing.T) {
 		rec := httptest.NewRecorder()
 		ctx.Router().ServeHTTP(rec, req)
 		require.Equal(t, http.StatusOK, rec.Code)
+	}, TestOptions)
+}
+
+func TestPruneRejectsOversizedUnknownLengthBodyBeforeMutation(t *testing.T) {
+	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
+		helper := newMockHelper(t, ctx)
+		token, _ := helper.SetupAuthenticatedTest()
+		req := ctx.NewAPIRequest(http.MethodPost, "/api/prune", nil)
+		req.Body = io.NopCloser(bytes.NewReader(bytes.Repeat([]byte{'x'}, (10<<20)+1)))
+		req.ContentLength = -1
+		setAuthHeader(req, token)
+		rec := httptest.NewRecorder()
+		ctx.Router().ServeHTTP(rec, req)
+		require.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+		svc := core.GetService[*siaMocks.MockSiaService](ctx, pluginCore.SIA_SERVICE)
+		svc.AssertNotCalled(t, "PruneAccount", mock.Anything, mock.Anything)
+	}, TestOptions)
+}
+
+func TestDeleteAppRejectsOversizedUnknownLengthBodyBeforeLookup(t *testing.T) {
+	coreTesting.RunTestCase(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
+		helper := newMockHelper(t, ctx)
+		token, _ := helper.SetupAuthenticatedTest()
+		req := ctx.NewAPIRequest(http.MethodDelete, "/api/apps/"+strings.Repeat("0", 64), nil)
+		req.Body = io.NopCloser(bytes.NewReader(bytes.Repeat([]byte{'x'}, (10<<20)+1)))
+		req.ContentLength = -1
+		setAuthHeader(req, token)
+		rec := httptest.NewRecorder()
+		ctx.Router().ServeHTTP(rec, req)
+		require.Equal(t, http.StatusRequestEntityTooLarge, rec.Code)
+		svc := core.GetService[*siaMocks.MockSiaService](ctx, pluginCore.SIA_SERVICE)
+		svc.AssertNotCalled(t, "GetAccount", mock.Anything, mock.Anything)
 	}, TestOptions)
 }
 
