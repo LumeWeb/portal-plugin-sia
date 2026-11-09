@@ -9,25 +9,15 @@ import (
 
 var appFields = []string{"id", "account_key", "created_at", "updated_at"}
 
-// AllScalarFieldRules also allows pattern and null operators, which are not
-// useful for these non-null ID and timestamp columns.
-var scalarOperators = []filter.Operator{
-	filter.OpEq, filter.OpNe, filter.OpLt, filter.OpGt, filter.OpLte, filter.OpGte,
-	filter.OpIn, filter.OpNin, filter.OpBetween, filter.OpNbetween,
-}
-
 // AppQueryPolicy restricts local query fields and converts public keys to the raw bytes
 // stored in sia_app_accounts. Display metadata is fetched from indexd.
 func AppQueryPolicy() filter.QueryPolicy {
-	return filter.QueryPolicy{
-		Fields: map[string]filter.FieldRule{
-			"id":          {Operators: scalarOperators},
-			"created_at":  {Operators: scalarOperators},
-			"updated_at":  {Operators: scalarOperators},
-			"account_key": {Operators: []filter.Operator{filter.OpEq, filter.OpNe, filter.OpIn, filter.OpNin}, Convert: convertAccountKey},
-		},
-		SortFields: appFields,
+	fields := filter.ComparableFieldRules("id", "created_at", "updated_at")
+	fields["account_key"] = filter.FieldRule{
+		Operators: []filter.Operator{filter.OpEq, filter.OpNe, filter.OpIn, filter.OpNin},
+		Convert:   convertAccountKey,
 	}
+	return filter.QueryPolicy{Fields: fields, SortFields: appFields}
 }
 
 func convertAccountKey(op filter.Operator, value any) (any, error) {
