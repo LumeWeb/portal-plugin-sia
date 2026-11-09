@@ -16,7 +16,7 @@ require (
 	go.lumeweb.com/portal-middleware v0.3.7
 	go.lumeweb.com/portal-plugin-quota v0.0.0-20260425220337-a342aa31f1f8
 	go.lumeweb.com/portal-router v0.7.6
-	go.lumeweb.com/queryutil v0.3.21
+	go.lumeweb.com/queryutil v0.3.22
 	go.lumeweb.com/web/go/portal-plugin-sia v0.0.0-20260630053457-d84cb76aa9af
 	go.opentelemetry.io/otel v1.44.0
 	go.sia.tech/core v0.21.7

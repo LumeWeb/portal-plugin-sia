@@ -1,4 +1,4 @@
-package appquery
+package dto
 
 import (
 	"encoding/hex"
@@ -9,23 +9,21 @@ import (
 
 var appFields = []string{"id", "account_key", "created_at", "updated_at"}
 
-var comparisonOperators = []filter.Operator{
+// AllScalarFieldRules also allows pattern and null operators, which are not
+// useful for these non-null ID and timestamp columns.
+var scalarOperators = []filter.Operator{
 	filter.OpEq, filter.OpNe, filter.OpLt, filter.OpGt, filter.OpLte, filter.OpGte,
 	filter.OpIn, filter.OpNin, filter.OpBetween, filter.OpNbetween,
-	filter.OpNull, filter.OpNnull,
-	filter.OpContains, filter.OpContainss, filter.OpNcontains, filter.OpNcontainss,
-	filter.OpStartswith, filter.OpStartswiths, filter.OpNstartswith, filter.OpNstartswiths,
-	filter.OpEndswith, filter.OpEndswiths, filter.OpNendswith, filter.OpNendswiths,
 }
 
-// Policy restricts local query fields and converts public keys to the raw bytes
+// AppQueryPolicy restricts local query fields and converts public keys to the raw bytes
 // stored in sia_app_accounts. Display metadata is fetched from indexd.
-func Policy() filter.QueryPolicy {
+func AppQueryPolicy() filter.QueryPolicy {
 	return filter.QueryPolicy{
 		Fields: map[string]filter.FieldRule{
-			"id":          {Operators: comparisonOperators},
-			"created_at":  {Operators: comparisonOperators},
-			"updated_at":  {Operators: comparisonOperators},
+			"id":          {Operators: scalarOperators},
+			"created_at":  {Operators: scalarOperators},
+			"updated_at":  {Operators: scalarOperators},
 			"account_key": {Operators: []filter.Operator{filter.OpEq, filter.OpNe, filter.OpIn, filter.OpNin}, Convert: convertAccountKey},
 		},
 		SortFields: appFields,
