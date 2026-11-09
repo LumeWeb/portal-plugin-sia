@@ -3,16 +3,18 @@ package api
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
 	mcontext "go.lumeweb.com/portal-middleware/context"
-	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
 	"go.lumeweb.com/portal-plugin-sia/internal"
 	"go.lumeweb.com/portal-plugin-sia/internal/api/dto"
+	"go.lumeweb.com/portal-plugin-sia/internal/appquery"
 	router "go.lumeweb.com/portal-router"
 	core "go.lumeweb.com/portal/core"
 	"go.lumeweb.com/queryutil"
+	"go.lumeweb.com/queryutil/filter/parser"
 	queryutilHttp "go.lumeweb.com/queryutil/http"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -27,25 +29,38 @@ func (a *API) listAppsHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusUnauthorized, "login required")
 	}
 
-	return queryutilHttp.ProcessListRequest(
-		c.Response(),
-		c.Request(),
-		"apps",
-		func(filters []queryutil.CrudFilter, sorts []queryutil.Sort, pagination queryutil.Pagination) ([]pluginCore.AppAccount, int64, error) {
-			return a.siaSvc.ListApps(c.Request().Context(), userID, filters, sorts, pagination)
-		},
-		func(app pluginCore.AppAccount) dto.AppResponse {
-			return dto.AppResponse{
-				PublicKey:   hex.EncodeToString(app.PublicKey[:]),
-				Name:        app.Name,
-				Description: app.Description,
-				LogoURL:     app.LogoURL,
-				ServiceURL:  app.ServiceURL,
-				PinnedData:  app.PinnedData,
-				LastUsed:    app.LastUsed,
-			}
-		},
-	)
+	filters, sorts, pagination, err := queryutil.ParseRequestWithOptions(c.Request(), parser.WithStringFields("account_key"))
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid app query parameters")
+	}
+	if _, err := appquery.Policy().Normalize(filters, sorts); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, "invalid app query parameters")
+	}
+
+	apps, total, err := a.siaSvc.ListApps(c.Request().Context(), userID, filters, sorts, pagination)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(c.Response(), "Entity apps not found", http.StatusNotFound)
+		} else {
+			http.Error(c.Response(), fmt.Sprintf("Failed to list apps: %v", err), http.StatusInternalServerError)
+		}
+		return err
+	}
+
+	responses := make([]dto.AppResponse, len(apps))
+	for i, app := range apps {
+		responses[i] = dto.AppResponse{
+			PublicKey:   hex.EncodeToString(app.PublicKey[:]),
+			Name:        app.Name,
+			Description: app.Description,
+			LogoURL:     app.LogoURL,
+			ServiceURL:  app.ServiceURL,
+			PinnedData:  app.PinnedData,
+			LastUsed:    app.LastUsed,
+		}
+	}
+	queryutilHttp.SetContentRangeHeader(c.Response(), "apps", pagination, responses, total)
+	return queryutilHttp.EncodeJSON(c.Response(), queryutil.BuildResponse(responses, total))
 }
 
 // deleteAppHandler deletes a single app account via the admin client.
@@ -125,7 +140,7 @@ func buildAppsRoutes(a *API) []router.RouteDefinition {
 			authMW,
 			router.WithSwagger(
 				router.WithSummary("List connected apps"),
-				router.WithDescription("Returns a paginated, filtered, sorted list of apps connected to the user's Sia account."),
+				router.WithDescription("Returns apps connected to the user's Sia account. Filters and sorts support id, account_key, created_at, and updated_at. App display metadata is not a local query field."),
 				router.WithTags(tagApps),
 				router.WithSuccessResponse(http.StatusOK, "App list",
 					router.WithJSONContent(dto.AppListResponse{}),
