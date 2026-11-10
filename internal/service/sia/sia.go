@@ -12,7 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	pluginCore "go.lumeweb.com/portal-plugin-sia/core"
 	"go.lumeweb.com/portal-plugin-sia/internal"
-	"go.lumeweb.com/portal-plugin-sia/internal/appquery"
+	"go.lumeweb.com/portal-plugin-sia/internal/api/dto"
 	pluginConfig "go.lumeweb.com/portal-plugin-sia/internal/config"
 	siaDB "go.lumeweb.com/portal-plugin-sia/internal/db"
 	"go.lumeweb.com/portal-plugin-sia/internal/events"
@@ -20,6 +20,7 @@ import (
 	core "go.lumeweb.com/portal/core"
 	db "go.lumeweb.com/portal/db"
 	"go.lumeweb.com/queryutil"
+	"go.lumeweb.com/queryutil/filter/builder"
 	"go.sia.tech/core/rhp/v4"
 	"go.sia.tech/core/types"
 	"go.sia.tech/indexd/accounts"
@@ -794,9 +795,18 @@ func (s *SiaService) ListApps(ctx context.Context, userID uint, filters []queryu
 	ctx, span := core.TraceMethod(ctx, "SiaService.ListApps")
 	defer span.End()
 
-	filters, err := appquery.Policy().Normalize(filters, sorts)
+	filters, err := dto.AppQueryPolicy().Normalize(filters, sorts)
 	if err != nil {
 		return nil, 0, err
+	}
+	if pagination == (queryutil.Pagination{}) {
+		pagination = queryutil.DefaultPagination
+	}
+	if pagination.PageSize > 100 || pagination.End <= pagination.Start || pagination.End-pagination.Start != pagination.PageSize {
+		return nil, 0, fmt.Errorf("invalid app pagination")
+	}
+	if _, err := queryutil.NewPagination(pagination.Start, pagination.PageSize); err != nil {
+		return nil, 0, fmt.Errorf("invalid app pagination: %w", err)
 	}
 
 	// 1. Get the user's Sia account (provides siaAccountID for the filter)
@@ -815,7 +825,10 @@ func (s *SiaService) ListApps(ctx context.Context, userID uint, filters []queryu
 		Where("sia_account_id = ?", account.ID)
 
 	// Apply user-provided filters
-	query = queryutil.ApplyFilters(query, filters, nil)
+	query, err = builder.NewGORMBuilder(query, nil).Apply(query, filters)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to apply app filters: %w", err)
+	}
 
 	// Apply sorts
 	query = queryutil.ApplySort(query, sorts)

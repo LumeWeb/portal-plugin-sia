@@ -41,6 +41,45 @@ func TestListAppsFiltersByHexPublicKey(t *testing.T) {
 	}, TestOptions)
 }
 
+func TestListAppsDefaultsUnspecifiedServicePaginationToTen(t *testing.T) {
+	coreTesting.RunTestCaseWithDB(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
+		svc := core.GetService[*SiaService](ctx, pluginCore.SIA_SERVICE)
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte("[]"))
+		}))
+		defer upstream.Close()
+		svc.adminClient = admin.NewClient(upstream.URL, "test")
+		owner, err := svc.RegisterAccount(ctx, 1)
+		require.NoError(t, err)
+		for i := 0; i < 11; i++ {
+			_, err = svc.RegisterAppAccount(ctx, owner.ID, generateTestPublicKey())
+			require.NoError(t, err)
+		}
+		rows, total, err := svc.ListApps(ctx, 1, nil, nil, queryutil.Pagination{})
+		require.NoError(t, err)
+		require.EqualValues(t, 11, total)
+		require.Len(t, rows, 10)
+	}, TestOptions)
+}
+
+func TestListAppsRejectsInvalidServicePagination(t *testing.T) {
+	coreTesting.RunTestCaseWithDB(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
+		svc := core.GetService[*SiaService](ctx, pluginCore.SIA_SERVICE)
+		for _, page := range []queryutil.Pagination{
+			{Start: 0, End: 101, PageSize: 101},
+			{Start: -1, End: 9, PageSize: 10},
+			{Start: 0, End: 10, PageSize: 0},
+			{Start: 0, End: 20, PageSize: 10},
+		} {
+			rows, total, err := svc.ListApps(ctx, 1, nil, nil, page)
+			require.Error(t, err, "pagination: %+v", page)
+			require.Empty(t, rows)
+			require.Zero(t, total)
+		}
+	}, TestOptions)
+}
+
 func TestListAppsRejectsUnsafeQueryFields(t *testing.T) {
 	coreTesting.RunTestCaseWithDB(t, func(tb coreTesting.TB, ctx coreTesting.TestContext) {
 		svc := core.GetService[*SiaService](ctx, pluginCore.SIA_SERVICE)

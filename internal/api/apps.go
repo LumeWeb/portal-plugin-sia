@@ -10,7 +10,6 @@ import (
 	mcontext "go.lumeweb.com/portal-middleware/context"
 	"go.lumeweb.com/portal-plugin-sia/internal"
 	"go.lumeweb.com/portal-plugin-sia/internal/api/dto"
-	"go.lumeweb.com/portal-plugin-sia/internal/appquery"
 	router "go.lumeweb.com/portal-router"
 	core "go.lumeweb.com/portal/core"
 	"go.lumeweb.com/queryutil"
@@ -33,7 +32,7 @@ func (a *API) listAppsHandler(c echo.Context) error {
 	if err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid app query parameters")
 	}
-	if _, err := appquery.Policy().Normalize(filters, sorts); err != nil {
+	if _, err := dto.AppQueryPolicy().Normalize(filters, sorts); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, "invalid app query parameters")
 	}
 

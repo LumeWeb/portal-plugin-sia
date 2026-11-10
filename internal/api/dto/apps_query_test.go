@@ -1,4 +1,4 @@
-package appquery
+package dto
 
 import (
 	"strings"
@@ -21,7 +21,7 @@ func TestPolicyRejectsUnsupportedFilterImplementationsAndGroups(t *testing.T) {
 		&filter.ConditionalFilter{Operator: "unknown", Filters: []queryutil.CrudFilter{queryutil.NewLogicalFilter("id", filter.OpEq, 1)}},
 		cycle,
 	} {
-		_, err := Policy().Normalize([]queryutil.CrudFilter{f}, nil)
+		_, err := AppQueryPolicy().Normalize([]queryutil.CrudFilter{f}, nil)
 		require.ErrorIs(t, err, filter.ErrInvalidQuery)
 	}
 }
@@ -30,11 +30,24 @@ func TestPolicyConvertsNestedHexAccountKeysWithoutMutatingInput(t *testing.T) {
 	hexKey := strings.Repeat("ab", 32)
 	leaf := queryutil.NewLogicalFilter("account_key", filter.OpIn, []any{hexKey})
 	input := []queryutil.CrudFilter{queryutil.NewConditionalFilter(filter.LogicalOr, []queryutil.CrudFilter{leaf})}
-	normalized, err := Policy().Normalize(input, nil)
+	normalized, err := AppQueryPolicy().Normalize(input, nil)
 	require.NoError(t, err)
 	converted := normalized[0].GetFilters()[0].GetValue().([]any)
 	require.Equal(t, []byte(strings.Repeat("\xab", 32)), converted[0])
 	require.Equal(t, hexKey, leaf.Value().([]any)[0])
+}
+
+func TestPolicyRejectsPatternFiltersOnNumericAndTimestampFields(t *testing.T) {
+	for _, field := range []string{"id", "created_at", "updated_at"} {
+		t.Run(field, func(t *testing.T) {
+			_, err := AppQueryPolicy().Normalize([]queryutil.CrudFilter{
+				queryutil.NewLogicalFilter(field, filter.OpContains, "2026"),
+			}, nil)
+			require.ErrorIs(t, err, filter.ErrInvalidQuery)
+		})
+	}
+	_, err := AppQueryPolicy().Normalize([]queryutil.CrudFilter{queryutil.NewLogicalFilter("id", filter.OpEq, 42)}, nil)
+	require.NoError(t, err)
 }
 
 func TestPolicyRejectsMalformedAccountKeysAndUnsupportedOperators(t *testing.T) {
@@ -48,7 +61,7 @@ func TestPolicyRejectsMalformedAccountKeysAndUnsupportedOperators(t *testing.T) 
 		{filter.OpIn, []any{strings.Repeat("ab", 32), "bad"}},
 		{filter.OpContains, "ab"},
 	} {
-		_, err := Policy().Normalize([]queryutil.CrudFilter{queryutil.NewLogicalFilter("account_key", tc.op, tc.value)}, nil)
+		_, err := AppQueryPolicy().Normalize([]queryutil.CrudFilter{queryutil.NewLogicalFilter("account_key", tc.op, tc.value)}, nil)
 		require.ErrorIs(t, err, filter.ErrInvalidQuery)
 	}
 }

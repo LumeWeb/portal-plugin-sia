@@ -1,4 +1,4 @@
-package appquery
+package dto
 
 import (
 	"encoding/hex"
@@ -9,27 +9,15 @@ import (
 
 var appFields = []string{"id", "account_key", "created_at", "updated_at"}
 
-var comparisonOperators = []filter.Operator{
-	filter.OpEq, filter.OpNe, filter.OpLt, filter.OpGt, filter.OpLte, filter.OpGte,
-	filter.OpIn, filter.OpNin, filter.OpBetween, filter.OpNbetween,
-	filter.OpNull, filter.OpNnull,
-	filter.OpContains, filter.OpContainss, filter.OpNcontains, filter.OpNcontainss,
-	filter.OpStartswith, filter.OpStartswiths, filter.OpNstartswith, filter.OpNstartswiths,
-	filter.OpEndswith, filter.OpEndswiths, filter.OpNendswith, filter.OpNendswiths,
-}
-
-// Policy restricts local query fields and converts public keys to the raw bytes
+// AppQueryPolicy restricts local query fields and converts public keys to the raw bytes
 // stored in sia_app_accounts. Display metadata is fetched from indexd.
-func Policy() filter.QueryPolicy {
-	return filter.QueryPolicy{
-		Fields: map[string]filter.FieldRule{
-			"id":          {Operators: comparisonOperators},
-			"created_at":  {Operators: comparisonOperators},
-			"updated_at":  {Operators: comparisonOperators},
-			"account_key": {Operators: []filter.Operator{filter.OpEq, filter.OpNe, filter.OpIn, filter.OpNin}, Convert: convertAccountKey},
-		},
-		SortFields: appFields,
+func AppQueryPolicy() filter.QueryPolicy {
+	fields := filter.ComparableFieldRules("id", "created_at", "updated_at")
+	fields["account_key"] = filter.FieldRule{
+		Operators: []filter.Operator{filter.OpEq, filter.OpNe, filter.OpIn, filter.OpNin},
+		Convert:   convertAccountKey,
 	}
+	return filter.QueryPolicy{Fields: fields, SortFields: appFields}
 }
 
 func convertAccountKey(op filter.Operator, value any) (any, error) {
